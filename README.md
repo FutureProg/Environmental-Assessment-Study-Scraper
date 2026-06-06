@@ -1,0 +1,153 @@
+# Municipal Environmental Assessment Scraper
+
+## The Problem
+Municipal class environmental assessments (EAs) are significant for Safe Streets Halton for two reasons: proposed road changes within an EA can directly impact pedestrian and cyclist safety, and EAs include public consultation windows with strict deadlines — missing the start of a study means missing the opportunity to participate.
+
+Currently, Safe Streets Halton has no way of being notified when a new EA begins. This is checked manually and infrequently through each municipality's website, which risks missing new studies entirely or catching them too late to engage.
+
+## Proposal
+A job that runs regularly to scrape each municipality's EA listing pages, compare results to a stored snapshot, and post a Discord notification when new studies are detected.
+
+## Municipalities Covered
+
+Each municipality exposes EA information differently, which means the scraper requires a custom adapter per source.
+
+| Municipality | EA Listing Page | Structure | Status Field | Notes |
+|---|---|---|---|---|
+| **Halton Region** | [EA Studies](https://www.halton.ca/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies) | Searchable table (Project, Municipality, Status) | Structured: `On-going`, `Deferred`, `Completed` | 5 pages of results; individual study pages linked |
+| **City of Burlington** | [EA Projects](https://www.burlington.ca/Modules/News/en/Environmental) | News/blog post format, paginated | Free-form text within post body | No structured status field; dates embedded in post text |
+| **Town of Oakville** | [EA Studies](https://www.oakville.ca/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/) | Simple list with title and 1–2 sentence description | No status on listing page | Must follow individual study links to determine status |
+| **Town of Milton** | [Town Projects](https://www.milton.ca/en/business-and-development/town-projects.aspx) | No central EA listing; projects spread across individual pages | Embedded in project page text | Individual pages are rich (full timelines, public open house dates/locations, comment deadlines) |
+| **Town of Halton Hills** | [EA Studies](https://www.haltonhills.ca/en/residents/environmental-assessment-ea-studies.aspx) | Structured listing with study details | Free-form text (e.g. "Study initiated April 2015, on-going") | Includes consultant names, contact info, and PIC dates |
+
+## Scraping Approach by Municipality
+
+Each municipality requires a custom adapter. Approaches are documented below as they are implemented.
+
+### Halton Region
+
+```mermaid
+flowchart TD
+    A([Cron Trigger\nDeno Deploy]) --> B[Fetch page 1 of EA listing\nhalton.ca]
+    B --> C[Parse table rows\nJSDOM]
+    C --> D{More pages?}
+    D -- Yes --> E[Fetch next page]
+    E --> C
+    D -- No --> F[Full study list]
+
+    F --> G[(PostgreSQL\nStored Studies)]
+    G --> H{Compare results}
+
+    H --> I[New studies]
+    H --> J[Existing studies\nwith changed status]
+
+    I --> K[Claude: is this\nin scope?]
+    K -- Yes --> L[Post Discord\nnotification]
+    K -- No --> M[Store as\nout-of-scope]
+
+    J --> N{Was study\npreviously in-scope?}
+    N -- Yes --> O[Post Discord\nstatus change alert]
+    N -- No --> P[Ignore]
+
+    L --> Q[(Update PostgreSQL)]
+    M --> Q
+    O --> Q
+    P --> Q
+```
+
+- **Listing page:** Paginated searchable table at `/municipal-class-environmental-assessment-studies`
+- **Pagination:** The table spans multiple pages (currently 5); the adapter iterates through all pages using the `page=` query parameter until no further results are returned
+- **Parsed fields:** Project name, municipality, status (`On-going` / `Deferred` / `Completed`), and link to the individual study page
+- **CSS selector:** Results are in `.hal-generic-smart-search-results-table tbody tr`; each row contains three `<td>` elements in order: project name (with anchor), municipality, status
+- **Individual study pages:** Linked from the project name column; contain additional detail including study description and engagement information (see [Engagement Data Extraction](#engagement-data-extraction-planned))
+
+### City of Burlington *(TBD)*
+
+Burlington publishes EA studies as paginated news posts rather than a structured table. Approach to be determined.
+
+### Town of Oakville *(TBD)*
+
+Oakville's listing page contains titles and brief descriptions only — no status field. Approach to be determined, likely requiring individual page visits to extract status.
+
+### Town of Milton *(TBD)*
+
+Milton has no central EA listing page. Studies are discoverable only through the general Town Projects index. Discovery strategy to be determined.
+
+### Town of Halton Hills *(TBD)*
+
+Halton Hills has a structured listing with rich metadata (consultant, contact, PIC dates), but status is embedded in free-form prose. Approach to be determined.
+
+---
+
+## How It Works
+1. A scheduled job runs a municipality-specific adapter for each of the five sources
+2. Each adapter uses JSDOM to fetch and parse the EA listing page into a normalised list of studies with title, URL, and status where available
+3. Results are compared against the studies stored in PostgreSQL
+4. For each **new** study, Claude classifies whether it falls within Safe Streets Halton's scope — road, intersection, active transportation, or similar infrastructure — as opposed to out-of-scope work like water mains or utility projects
+5. For each **existing** study, the scraper checks whether the status has changed since the last run
+6. A Discord notification is sent for new in-scope studies, and for status changes on studies previously classified as in-scope
+7. The database is updated to reflect the latest study list and statuses
+
+> **Note on status accuracy:** Status fields are inconsistently structured across municipalities — Halton Region uses discrete values (`On-going`, `Deferred`, `Completed`), while others embed status in free-form text or omit it from the listing page entirely. The scraper records whatever is shown and tracks changes over time, but manual verification is recommended for any study where the status seems unexpectedly stale.
+
+## Engagement Data Extraction *(planned)*
+
+Where available, each EA study's individual page will be scraped for:
+- **Public consultation dates and times** — open houses, comment deadlines, or hearing dates
+- **Engagement links** — registration pages, online comment forms, or document downloads
+
+This information is unstructured and inconsistently formatted across municipalities. For example, Milton's individual study pages include full public open house schedules (date, time, location, comment deadline) and links to platforms like "Let's Talk Milton", while Halton Hills pages list PIC dates and consultant contacts. Burlington embeds timeline information in news post body text with no consistent structure.
+
+Because no two municipalities format this data the same way, extraction will likely be handled by a language model rather than fixed selectors. The specific approach has not yet been decided.
+
+Extracted engagement data will be included in Discord notifications so Safe Streets Halton members have everything they need to participate without leaving the alert.
+
+## Tech Stack
+- [Deno](https://deno.com/) + TypeScript
+- [JSDOM](https://github.com/jsdom/jsdom) for HTML parsing
+- [Claude](https://www.anthropic.com/claude) (Anthropic) for EA scope classification
+- [Discord Webhooks](https://discord.com/developers/docs/resources/webhook) for notifications
+- [Deno Deploy](https://deno.com/deploy) for hosting and scheduling
+- [PostgreSQL](https://www.postgresql.org/) (via Deno Deploy) for snapshot persistence
+
+## Infrastructure Design
+
+This project was designed with a **zero-cost or near-zero-cost** deployment model in mind, while still being production-reliable.
+
+| Concern | Choice | Reasoning |
+|---|---|---|
+| **Language & Runtime** | Deno + TypeScript | Native TypeScript support eliminates a build step; Deno's explicit permissions model (network, env, file access declared upfront) is a good fit for a scraper that should have a minimal and auditable attack surface; and the rich standard library reduces dependency overhead |
+| **Hosting & Scheduling** | Deno Deploy | Pairs naturally with the Deno runtime; the free tier includes native cron triggers and serverless functions with no infrastructure to manage |
+| **Snapshot Storage** | PostgreSQL on Deno Deploy | Persistent storage is required to diff new scrape results against previously seen studies; co-locating the database on Deno Deploy avoids a separate managed service |
+| **HTML Parsing** | JSDOM | The target pages are server-rendered HTML, so a full headless browser (Playwright/Puppeteer) is unnecessary overhead — JSDOM is lighter, faster, and better supported in the Deno ecosystem |
+| **EA Classification** | Claude (Anthropic) | Municipal EA listings often provide only a title and brief description, with no structured category field. A language model can reliably infer whether a study involves road, intersection, or active transportation infrastructure — the types relevant to Safe Streets Halton — versus unrelated work like water mains or utilities. Claude Haiku makes this cost-effective at scale. |
+| **Notifications** | Discord Webhook | Free and instant with no email server or mailing service required — a single webhook URL is all that's needed to post alerts to a channel |
+
+This stack keeps operational costs at $0 while providing persistent state, reliable scheduling, and real-time alerts — a practical pattern for civic-tech tools that need to run indefinitely without active maintenance.
+
+## Setup
+
+**Prerequisites:** [Deno](https://deno.com/) installed
+
+```bash
+git clone <repo-url>
+cd EAStudyParser
+```
+
+Set the required environment variables:
+
+```bash
+export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+export DATABASE_URL=postgresql://...
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Run the scraper locally:
+
+```bash
+deno task dev
+```
+
+## Deployment
+
+Deploy to [Deno Deploy](https://deno.com/deploy) and configure the above environment variables in the project settings. Use Deno Deploy's built-in cron trigger to run the scraper on a schedule (e.g. daily at 8am UTC).

@@ -1,0 +1,320 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "jsr:@std/xml@~0.1.2": "0.1.2",
+    "npm:@types/jsdom@^28.0.3": "28.0.3",
+    "npm:add@^2.0.6": "2.0.6",
+    "npm:deno@^2.8.2": "2.8.2",
+    "npm:jsdom@^29.1.1": "29.1.1"
+  },
+  "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/xml@0.1.2": {
+      "integrity": "a17a771548f10895b9a2a54b39b52e2e27e0617e0e05bb5919c04c87f89007f0"
+    }
+  },
+  "npm": {
+    "@asamuzakjp/css-color@5.1.11": {
+      "integrity": "sha512-KVw6qIiCTUQhByfTd78h2yD1/00waTmm9uy/R7Ck/ctUyAPj+AEDLkQIdJW0T8+qGgj3j5bpNKK7Q3G+LedJWg==",
+      "dependencies": [
+        "@asamuzakjp/generational-cache",
+        "@csstools/css-calc",
+        "@csstools/css-color-parser",
+        "@csstools/css-parser-algorithms",
+        "@csstools/css-tokenizer"
+      ]
+    },
+    "@asamuzakjp/dom-selector@7.1.1": {
+      "integrity": "sha512-67RZDnYRc8H/8MLDgQCDE//zoqVFwajkepHZgmXrbwybzXOEwOWGPYGmALYl9J2DOLfFPPs6kKCqmbzV895hTQ==",
+      "dependencies": [
+        "@asamuzakjp/generational-cache",
+        "@asamuzakjp/nwsapi",
+        "bidi-js",
+        "css-tree",
+        "is-potential-custom-element-name"
+      ]
+    },
+    "@asamuzakjp/generational-cache@1.0.1": {
+      "integrity": "sha512-wajfB8KqzMCN2KGNFdLkReeHncd0AslUSrvHVvvYWuU8ghncRJoA50kT3zP9MVL0+9g4/67H+cdvBskj9THPzg=="
+    },
+    "@asamuzakjp/nwsapi@2.3.9": {
+      "integrity": "sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q=="
+    },
+    "@bramus/specificity@2.4.2": {
+      "integrity": "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==",
+      "dependencies": [
+        "css-tree"
+      ],
+      "bin": true
+    },
+    "@csstools/color-helpers@6.0.2": {
+      "integrity": "sha512-LMGQLS9EuADloEFkcTBR3BwV/CGHV7zyDxVRtVDTwdI2Ca4it0CCVTT9wCkxSgokjE5Ho41hEPgb8OEUwoXr6Q=="
+    },
+    "@csstools/css-calc@3.2.1_@csstools+css-parser-algorithms@4.0.0__@csstools+css-tokenizer@4.0.0_@csstools+css-tokenizer@4.0.0": {
+      "integrity": "sha512-DtdHlgXh5ZkA43cwBcAm+huzgJiwx3ZTWVjBs94kwz2xKqSimDA3lBgCjphYgwgVUMWatSM0pDd8TILB1yrVVg==",
+      "dependencies": [
+        "@csstools/css-parser-algorithms",
+        "@csstools/css-tokenizer"
+      ]
+    },
+    "@csstools/css-color-parser@4.1.1_@csstools+css-parser-algorithms@4.0.0__@csstools+css-tokenizer@4.0.0_@csstools+css-tokenizer@4.0.0": {
+      "integrity": "sha512-eZ5XOtyhK+mggRafYUWzA0tvaYOFgdY8AkgQiCJF9qNAePnUo/zmsqqYubBBb3sQ8uNUaSKTY9s9klfRaAXL0g==",
+      "dependencies": [
+        "@csstools/color-helpers",
+        "@csstools/css-calc",
+        "@csstools/css-parser-algorithms",
+        "@csstools/css-tokenizer"
+      ]
+    },
+    "@csstools/css-parser-algorithms@4.0.0_@csstools+css-tokenizer@4.0.0": {
+      "integrity": "sha512-+B87qS7fIG3L5h3qwJ/IFbjoVoOe/bpOdh9hAjXbvx0o8ImEmUsGXN0inFOnk2ChCFgqkkGFQ+TpM5rbhkKe4w==",
+      "dependencies": [
+        "@csstools/css-tokenizer"
+      ]
+    },
+    "@csstools/css-syntax-patches-for-csstree@1.1.5_css-tree@3.2.1": {
+      "integrity": "sha512-oNjBvzLq2GPZtJphCjLqXow/cHySHSgtxvKZb7OqSZ/xHgw6NWNhfad+6AB9cLeVm6eA9d/qMll3JdEHjy6M+A==",
+      "dependencies": [
+        "css-tree"
+      ],
+      "optionalPeers": [
+        "css-tree"
+      ]
+    },
+    "@csstools/css-tokenizer@4.0.0": {
+      "integrity": "sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA=="
+    },
+    "@deno/darwin-arm64@2.8.2": {
+      "integrity": "sha512-uKMHut+8weqKm4x5tQUrosaPye3mxYQ1RdHx8i8dnassdvjbGMudPCbQm/x/CmC8EWw32NmDNkCnqdm0vd2Tww==",
+      "os": ["darwin"],
+      "cpu": ["arm64"]
+    },
+    "@deno/darwin-x64@2.8.2": {
+      "integrity": "sha512-W+GmuIpoZGxhWMC18cWodhxMW/akh4DcLSttagHbbThLQ6I5P74VA89zebng/RR5Zb3kuF2xlwZRPcxaLjBywA==",
+      "os": ["darwin"],
+      "cpu": ["x64"]
+    },
+    "@deno/linux-arm64-glibc@2.8.2": {
+      "integrity": "sha512-rTh+olsxsrJhe+rEbdeJh3OvVBH9q0TrFMkxPMiIs+DnZsQm3l4dZHfZf3B9rveLHOx1I0tLdGs02dxAgx2TPA==",
+      "os": ["linux"],
+      "cpu": ["arm64"]
+    },
+    "@deno/linux-x64-glibc@2.8.2": {
+      "integrity": "sha512-T04G8j2mGwkaYhtmpTwoGJnfFSDpM8GB8yxSmQMQLgqDFDeyHUy8OZKCOC2P7ZwMduBu/4TBjYQzohQHjkKjNg==",
+      "os": ["linux"],
+      "cpu": ["x64"]
+    },
+    "@deno/win32-arm64@2.8.2": {
+      "integrity": "sha512-ezzlZBJ1tBktrpcu+v8gc4Obn2zF/wVKSI+50410PUwW6y3d7h2EngUN29Rp1czeu/rDNZuboSrCWHOYsIMNxQ==",
+      "os": ["win32"],
+      "cpu": ["arm64"]
+    },
+    "@deno/win32-x64@2.8.2": {
+      "integrity": "sha512-34GQ/W3hy5TTl6VQ7tTXcnDckLyh2AK//ig7ELDT8UpUj2e7HvIhrX1ve0wz+fXYXrxft5+4f4dlMGDQUEKu+Q==",
+      "os": ["win32"],
+      "cpu": ["x64"]
+    },
+    "@exodus/bytes@1.15.1": {
+      "integrity": "sha512-S6mL0yNB/Abt9Ei4tq8gDhcczc4S3+vQ4ra7vxnAf+YHC02srtqxKKZghx2Dq6p0e66THKwR6r8N6P95wEty7Q=="
+    },
+    "@types/jsdom@28.0.3": {
+      "integrity": "sha512-/HQ2uFoetFTXuye8vzIcHw2z6Fwi7Hi/qcgC+RoS9NCyewiqxhVGqlG+ViGB6lkax481R6dmhf1I7lIGlzJStQ==",
+      "dependencies": [
+        "@types/node",
+        "@types/tough-cookie",
+        "parse5",
+        "undici-types"
+      ]
+    },
+    "@types/node@25.9.2": {
+      "integrity": "sha512-G05zqtJhcDLb8uslf5EjCxXg9G1KQxiV8OS0R26IC//Eoyitzqe8z37I7cqvnZlrlSfgocQRfSn/AHBZJJFyGw==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
+    "@types/tough-cookie@4.0.5": {
+      "integrity": "sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA=="
+    },
+    "add@2.0.6": {
+      "integrity": "sha512-j5QzrmsokwWWp6kUcJQySpbG+xfOBqqKnup3OIk1pz+kB/80SLorZ9V8zHFLO92Lcd+hbvq8bT+zOGoPkmBV0Q=="
+    },
+    "bidi-js@1.0.3": {
+      "integrity": "sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw==",
+      "dependencies": [
+        "require-from-string"
+      ]
+    },
+    "css-tree@3.2.1": {
+      "integrity": "sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA==",
+      "dependencies": [
+        "mdn-data",
+        "source-map-js"
+      ]
+    },
+    "data-urls@7.0.0": {
+      "integrity": "sha512-23XHcCF+coGYevirZceTVD7NdJOqVn+49IHyxgszm+JIiHLoB2TkmPtsYkNWT1pvRSGkc35L6NHs0yHkN2SumA==",
+      "dependencies": [
+        "whatwg-mimetype",
+        "whatwg-url"
+      ]
+    },
+    "decimal.js@10.6.0": {
+      "integrity": "sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg=="
+    },
+    "deno@2.8.2": {
+      "integrity": "sha512-IMcdZBfJpzVEfc3N7obg+irBAHNKD3igwE7rX6I2MB3BiA9exHOh7DzH6XrOJgIp9nszyHfKyYL+EFBryVxPOA==",
+      "optionalDependencies": [
+        "@deno/darwin-arm64",
+        "@deno/darwin-x64",
+        "@deno/linux-arm64-glibc",
+        "@deno/linux-x64-glibc",
+        "@deno/win32-arm64",
+        "@deno/win32-x64"
+      ],
+      "scripts": true,
+      "bin": true
+    },
+    "entities@8.0.0": {
+      "integrity": "sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA=="
+    },
+    "html-encoding-sniffer@6.0.0": {
+      "integrity": "sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==",
+      "dependencies": [
+        "@exodus/bytes"
+      ]
+    },
+    "is-potential-custom-element-name@1.0.1": {
+      "integrity": "sha512-bCYeRA2rVibKZd+s2625gGnGF/t7DSqDs4dP7CrLA1m7jKWz6pps0LpYLJN8Q64HtmPKJ1hrN3nzPNKFEKOUiQ=="
+    },
+    "jsdom@29.1.1": {
+      "integrity": "sha512-ECi4Fi2f7BdJtUKTflYRTiaMxIB0O6zfR1fX0GXpUrf6flp8QIYn1UT20YQqdSOfk2dfkCwS8LAFoJDEppNK5Q==",
+      "dependencies": [
+        "@asamuzakjp/css-color",
+        "@asamuzakjp/dom-selector",
+        "@bramus/specificity",
+        "@csstools/css-syntax-patches-for-csstree",
+        "@exodus/bytes",
+        "css-tree",
+        "data-urls",
+        "decimal.js",
+        "html-encoding-sniffer",
+        "is-potential-custom-element-name",
+        "lru-cache",
+        "parse5",
+        "saxes",
+        "symbol-tree",
+        "tough-cookie",
+        "undici",
+        "w3c-xmlserializer",
+        "webidl-conversions",
+        "whatwg-mimetype",
+        "whatwg-url",
+        "xml-name-validator"
+      ]
+    },
+    "lru-cache@11.5.1": {
+      "integrity": "sha512-RPimw/7aMdv2oqRrxKwvZXcPfwBrn/JZ2xYcY9Hus/6LaS3VOAKVWKWgNLCFSiOm1ESXinjsDlidVU7JlnCN2A=="
+    },
+    "mdn-data@2.27.1": {
+      "integrity": "sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ=="
+    },
+    "parse5@8.0.1": {
+      "integrity": "sha512-z1e/HMG90obSGeidlli3hj7cbocou0/wa5HacvI3ASx34PecNjNQeaHNo5WIZpWofN9kgkqV1q5YvXe3F0FoPw==",
+      "dependencies": [
+        "entities"
+      ]
+    },
+    "punycode@2.3.1": {
+      "integrity": "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="
+    },
+    "require-from-string@2.0.2": {
+      "integrity": "sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw=="
+    },
+    "saxes@6.0.0": {
+      "integrity": "sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==",
+      "dependencies": [
+        "xmlchars"
+      ]
+    },
+    "source-map-js@1.2.1": {
+      "integrity": "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="
+    },
+    "symbol-tree@3.2.4": {
+      "integrity": "sha512-9QNk5KwDF+Bvz+PyObkmSYjI5ksVUYtjW7AU22r2NKcfLJcXp96hkDWU3+XndOsUb+AQ9QhfzfCT2O+CNWT5Tw=="
+    },
+    "tldts-core@7.4.2": {
+      "integrity": "sha512-nwEyF4vl4RSJjwSjBUmOSxc3BFPoIFdlRthJ6e+5v9P3bHNsoD06UjuqMUspqp7vsEZ1beaHi1km+optiE17yA=="
+    },
+    "tldts@7.4.2": {
+      "integrity": "sha512-kCwffuaH8ntKtygnWe1b4BJKWiCUH30n5KfoTr6IchcXOwR7chAOFJxFrH3vjANafUYrIA4a7SDL+nn7SiR4Sw==",
+      "dependencies": [
+        "tldts-core"
+      ],
+      "bin": true
+    },
+    "tough-cookie@6.0.1": {
+      "integrity": "sha512-LktZQb3IeoUWB9lqR5EWTHgW/VTITCXg4D21M+lvybRVdylLrRMnqaIONLVb5mav8vM19m44HIcGq4qASeu2Qw==",
+      "dependencies": [
+        "tldts"
+      ]
+    },
+    "tr46@6.0.0": {
+      "integrity": "sha512-bLVMLPtstlZ4iMQHpFHTR7GAGj2jxi8Dg0s2h2MafAE4uSWF98FC/3MomU51iQAMf8/qDUbKWf5GxuvvVcXEhw==",
+      "dependencies": [
+        "punycode"
+      ]
+    },
+    "undici-types@7.24.6": {
+      "integrity": "sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg=="
+    },
+    "undici@7.27.2": {
+      "integrity": "sha512-uZsKNuzQxDMUY6M3pIMvy5tvlGmtq8XJ2oLAkfRKGNu+1VQAIvLy2xIVG5ATZl5wDXl/tddByAWCizRbOme+TA=="
+    },
+    "w3c-xmlserializer@5.0.0": {
+      "integrity": "sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==",
+      "dependencies": [
+        "xml-name-validator"
+      ]
+    },
+    "webidl-conversions@8.0.1": {
+      "integrity": "sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ=="
+    },
+    "whatwg-mimetype@5.0.0": {
+      "integrity": "sha512-sXcNcHOC51uPGF0P/D4NVtrkjSU2fNsm9iog4ZvZJsL3rjoDAzXZhkm2MWt1y+PUdggKAYVoMAIYcs78wJ51Cw=="
+    },
+    "whatwg-url@16.0.1": {
+      "integrity": "sha512-1to4zXBxmXHV3IiSSEInrreIlu02vUOvrhxJJH5vcxYTBDAx51cqZiKdyTxlecdKNSjj8EcxGBxNf6Vg+945gw==",
+      "dependencies": [
+        "@exodus/bytes",
+        "tr46",
+        "webidl-conversions"
+      ]
+    },
+    "xml-name-validator@5.0.0": {
+      "integrity": "sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg=="
+    },
+    "xmlchars@2.2.0": {
+      "integrity": "sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@1",
+      "jsr:@std/xml@~0.1.2",
+      "npm:@types/jsdom@^28.0.3",
+      "npm:add@^2.0.6",
+      "npm:deno@^2.8.2",
+      "npm:jsdom@^29.1.1"
+    ]
+  }
+}
