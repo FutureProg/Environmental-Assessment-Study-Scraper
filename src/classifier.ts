@@ -6,15 +6,11 @@ const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
 const SYSTEM_PROMPT =
   `You are an assistant that classifies Ontario Municipal Class Environmental Assessment (MC EA) studies for Safe Streets Halton — a citizen advocacy group in Halton Region focused on road safety, active transportation (cycling/walking infrastructure), traffic calming, and intersection improvements.
 
-Classify each study by:
-1. Its project category (the type of infrastructure being assessed)
-2. Whether it falls within Safe Streets Halton's scope
-
-Safe Streets Halton's scope:
+Determine whether each study falls within Safe Streets Halton's scope:
 - IN SCOPE: road corridor studies, road widening/extension, intersection improvements, grade separations, active transportation (cycling lanes, multi-use paths, pedestrian infrastructure), traffic calming, transit projects with road/safety implications
 - OUT OF SCOPE: water and wastewater infrastructure, biosolids/composting/waste management, energy projects, utility projects with no road safety component
 
-Keep all reasoning fields to one short sentence.`;
+Keep the reasoning to one short sentence.`;
 
 export async function classifyStudy(study: EAStudy): Promise<EAClassification> {
   const descriptionSection = study.detail?.description
@@ -31,20 +27,14 @@ export async function classifyStudy(study: EAStudy): Promise<EAClassification> {
       input_schema: {
         type: 'object' as const,
         properties: {
-          mcCategory: {
-            type: 'string',
-            enum: ['road_and_structure', 'transit', 'water_and_wastewater', 'waste_management', 'energy', 'other'],
-            description: 'The Municipal Class Assessment project category',
-          },
-          mcCategoryReasoning: { type: 'string', description: 'Brief explanation of category choice' },
           scope: {
             type: 'string',
             enum: ['in_scope', 'out_of_scope', 'unclassified'],
             description: 'Whether this study is in scope for Safe Streets Halton',
           },
-          scopeReasoning: { type: 'string', description: 'Brief explanation of scope classification' },
+          scopeReasoning: { type: 'string', description: 'One-sentence explanation of the scope classification' },
         },
-        required: ['mcCategory', 'mcCategoryReasoning', 'scope', 'scopeReasoning'],
+        required: ['scope', 'scopeReasoning'],
       },
     }],
     tool_choice: { type: 'tool', name: 'classify_ea_study' },

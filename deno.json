@@ -7,11 +7,12 @@
       "read": true,
       "net": {"allow": ["www.halton.ca:443", "api.anthropic.com:443"]},
       "env": {"allow": ["JEST_WORKER_ID", "UNDICI_NO_WASM_SIMD", "ANTHROPIC_API_KEY",
-        "ANTHROPIC_*"]}
+        "ANTHROPIC_*", "DATABASE_URL"]}
     }
   },
   "imports": {
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk",
+    "postgres": "npm:postgres",
     "@std/assert": "jsr:@std/assert@1",
     "@std/xml": "jsr:@std/xml@^0.1.2",
     "@types/jsdom": "npm:@types/jsdom@^28.0.3",

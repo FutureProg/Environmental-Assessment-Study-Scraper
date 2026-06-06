@@ -1,18 +1,8 @@
 export type EAStatus = 'on_going' | 'deferred' | 'completed' | 'unknown';
 
-export type MCAssessmentCategory =
-  | 'road_and_structure'
-  | 'transit'
-  | 'water_and_wastewater'
-  | 'waste_management'
-  | 'energy'
-  | 'other';
-
 export type ScopeResult = 'in_scope' | 'out_of_scope' | 'unclassified';
 
 export interface EAClassification {
-  mcCategory: MCAssessmentCategory;
-  mcCategoryReasoning: string;
   scope: ScopeResult;
   scopeReasoning: string;
 }
