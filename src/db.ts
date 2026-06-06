@@ -1,7 +1,10 @@
 import postgres from 'postgres';
 import type { EAStudy, EAClassification } from './types.ts';
 
-const sql = postgres(Deno.env.get('DATABASE_URL')!);
+const cert = Deno.env.get('DATABASE_CERT');
+const sql = postgres(Deno.env.get('DATABASE_URL')!, {
+  ssl: cert ? { ca: cert } : undefined,
+});
 
 export async function upsertAssessment(
   study: EAStudy,
