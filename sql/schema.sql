@@ -53,25 +53,27 @@ INSERT INTO environmental_assessments.municipalities (name, listing_url, adapter
 -- ============================================================
 
 CREATE TABLE environmental_assessments.assessments (
-  id               SERIAL PRIMARY KEY,
-  title            TEXT NOT NULL,
-  municipality_id  INTEGER NOT NULL REFERENCES environmental_assessments.municipalities (id),
-  source_url       TEXT NOT NULL,
-  status           environmental_assessments.ea_status NOT NULL DEFAULT 'unknown',
-  raw_status       TEXT,
-  scope            environmental_assessments.ea_scope NOT NULL DEFAULT 'unclassified',
-  scope_reasoning  TEXT,
-  engagement_data  JSONB,
-  last_seen_at     TIMESTAMPTZ,
-  inserted_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT assessments_title_municipality_unique UNIQUE (title, municipality_id)
+  id                 SERIAL PRIMARY KEY,
+  title              TEXT NOT NULL,
+  municipality_owner INTEGER NOT NULL REFERENCES environmental_assessments.municipalities (id),
+  municipality_areas TEXT[] NOT NULL DEFAULT '{}',
+  source_url         TEXT NOT NULL,
+  status             environmental_assessments.ea_status NOT NULL DEFAULT 'unknown',
+  raw_status         TEXT,
+  scope              environmental_assessments.ea_scope NOT NULL DEFAULT 'unclassified',
+  scope_reasoning    TEXT,
+  engagement_data    JSONB,
+  last_seen_at       TIMESTAMPTZ,
+  inserted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT assessments_title_owner_unique UNIQUE (title, municipality_owner)
 );
 
-COMMENT ON COLUMN environmental_assessments.assessments.id              IS 'Primary key';
-COMMENT ON COLUMN environmental_assessments.assessments.title           IS 'Name of the EA study as it appears on the listing page';
-COMMENT ON COLUMN environmental_assessments.assessments.municipality_id IS 'Municipality this study belongs to';
-COMMENT ON COLUMN environmental_assessments.assessments.source_url      IS 'URL of the individual study page';
+COMMENT ON COLUMN environmental_assessments.assessments.id                 IS 'Primary key';
+COMMENT ON COLUMN environmental_assessments.assessments.title              IS 'Name of the EA study as it appears on the listing page';
+COMMENT ON COLUMN environmental_assessments.assessments.municipality_owner IS 'The municipality responsible for conducting this study';
+COMMENT ON COLUMN environmental_assessments.assessments.municipality_areas IS 'Geographic areas the study covers, as municipality name strings (e.g. ''{Burlington, Oakville}''). Queryable with = ANY(municipality_areas)';
+COMMENT ON COLUMN environmental_assessments.assessments.source_url         IS 'URL of the individual study page';
 COMMENT ON COLUMN environmental_assessments.assessments.status          IS 'Normalised status value derived from raw_status';
 COMMENT ON COLUMN environmental_assessments.assessments.raw_status      IS 'Verbatim status string scraped from the website before normalisation';
 COMMENT ON COLUMN environmental_assessments.assessments.scope           IS 'Whether this study is relevant to Safe Streets Halton, as determined by Claude';
@@ -118,3 +120,4 @@ COMMENT ON COLUMN environmental_assessments.engagement_events.inserted_at IS 'Wh
 
 CREATE INDEX engagement_events_study_id_idx   ON environmental_assessments.engagement_events (study_id);
 CREATE INDEX engagement_events_event_date_idx ON environmental_assessments.engagement_events (event_date);
+
