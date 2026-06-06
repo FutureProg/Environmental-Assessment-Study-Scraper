@@ -1,14 +1,14 @@
 # Municipal Environmental Assessment Scraper
 
-## The Problem
+## 🚨 The Problem
 Municipal class environmental assessments (EAs) are significant for Safe Streets Halton for two reasons: proposed road changes within an EA can directly impact pedestrian and cyclist safety, and EAs include public consultation windows with strict deadlines — missing the start of a study means missing the opportunity to participate.
 
 Currently, Safe Streets Halton has no way of being notified when a new EA begins. This is checked manually and infrequently through each municipality's website, which risks missing new studies entirely or catching them too late to engage.
 
-## Proposal
+## 💡 Proposal
 A job that runs regularly to scrape each municipality's EA listing pages, compare results to a stored snapshot, and post a Discord notification when new studies are detected.
 
-## Municipalities Covered
+## 🗺️ Municipalities Covered
 
 Each municipality exposes EA information differently, which means the scraper requires a custom adapter per source.
 
@@ -20,7 +20,7 @@ Each municipality exposes EA information differently, which means the scraper re
 | **Town of Milton** | [Town Projects](https://www.milton.ca/en/business-and-development/town-projects.aspx) | No central EA listing; projects spread across individual pages | Embedded in project page text | Individual pages are rich (full timelines, public open house dates/locations, comment deadlines) |
 | **Town of Halton Hills** | [EA Studies](https://www.haltonhills.ca/en/residents/environmental-assessment-ea-studies.aspx) | Structured listing with study details | Free-form text (e.g. "Study initiated April 2015, on-going") | Includes consultant names, contact info, and PIC dates |
 
-## Scraping Approach by Municipality
+## 🔍 Scraping Approach by Municipality
 
 Each municipality requires a custom adapter. Approaches are documented below as they are implemented.
 
@@ -79,7 +79,7 @@ Halton Hills has a structured listing with rich metadata (consultant, contact, P
 
 ---
 
-## How It Works
+## ⚙️ How It Works
 1. A scheduled job runs a municipality-specific adapter for each of the five sources
 2. Each adapter uses JSDOM to fetch and parse the EA listing page into a normalised list of studies with title, URL, and status where available
 3. Results are compared against the studies stored in PostgreSQL
@@ -90,7 +90,7 @@ Halton Hills has a structured listing with rich metadata (consultant, contact, P
 
 > **Note on status accuracy:** Status fields are inconsistently structured across municipalities — Halton Region uses discrete values (`On-going`, `Deferred`, `Completed`), while others embed status in free-form text or omit it from the listing page entirely. The scraper records whatever is shown and tracks changes over time, but manual verification is recommended for any study where the status seems unexpectedly stale.
 
-## Engagement Data Extraction *(planned)*
+## 📅 Engagement Data Extraction *(planned)*
 
 Where available, each EA study's individual page will be scraped for:
 - **Public consultation dates and times** — open houses, comment deadlines, or hearing dates
@@ -102,7 +102,7 @@ Because no two municipalities format this data the same way, extraction will lik
 
 Extracted engagement data will be included in Discord notifications so Safe Streets Halton members have everything they need to participate without leaving the alert.
 
-## Tech Stack
+## 🛠️ Tech Stack
 - [Deno](https://deno.com/) + TypeScript
 - [JSDOM](https://github.com/jsdom/jsdom) for HTML parsing
 - [Claude](https://www.anthropic.com/claude) (Anthropic) for EA scope classification
@@ -110,7 +110,7 @@ Extracted engagement data will be included in Discord notifications so Safe Stre
 - [Deno Deploy](https://deno.com/deploy) for hosting and scheduling
 - [PostgreSQL](https://www.postgresql.org/) (via Deno Deploy) for snapshot persistence
 
-## Infrastructure Design
+## 🏗️ Infrastructure Design
 
 This project was designed with a **zero-cost or near-zero-cost** deployment model in mind, while still being production-reliable.
 
@@ -125,7 +125,7 @@ This project was designed with a **zero-cost or near-zero-cost** deployment mode
 
 This stack keeps operational costs at $0 while providing persistent state, reliable scheduling, and real-time alerts — a practical pattern for civic-tech tools that need to run indefinitely without active maintenance.
 
-## Setup
+## 🚀 Setup
 
 **Prerequisites:** [Deno](https://deno.com/) installed
 
@@ -148,6 +148,6 @@ Run the scraper locally:
 deno task dev
 ```
 
-## Deployment
+## ☁️ Deployment
 
 Deploy to [Deno Deploy](https://deno.com/deploy) and configure the above environment variables in the project settings. Use Deno Deploy's built-in cron trigger to run the scraper on a schedule (e.g. daily at 8am UTC).
