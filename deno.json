@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-net main.ts"
+    "dev": "varlock run -- deno run --watch --allow-net main.ts"
   },
   "permissions": {
     "default": {

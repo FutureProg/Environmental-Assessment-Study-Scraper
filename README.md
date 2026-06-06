@@ -127,7 +127,7 @@ This stack keeps operational costs at $0 while providing persistent state, relia
 
 ## 🚀 Setup
 
-**Prerequisites:** [Deno](https://deno.com/) installed
+**Prerequisites:** [Deno](https://deno.com/) and [varlock](https://varlock.dev/getting-started/installation/) installed
 
 ```bash
 git clone <repo-url>
