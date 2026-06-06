@@ -1,5 +1,5 @@
 import { JSDOM } from 'jsdom';
-import type { EAStatus, EAStudy } from '../types.ts';
+import type { EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
 
 const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
@@ -142,4 +142,33 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
   }
 
   return groupIntoStudies(allRows);
+}
+
+/**
+ * Fetches a study's detail page and extracts descriptive content for classification.
+ *
+ * Extraction priority:
+ * 1. Text from `.ck-text` elements inside `div.hal-ea-studies-detail-bottom` (Purpose + Scope)
+ * 2. Full `main#hal-main-content` text
+ * 3. Body text as a last resort
+ */
+export async function fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail> {
+  const dom = await JSDOM.fromURL(sourceUrl, { pretendToBeVisual: true });
+  const doc = dom.window.document;
+
+  const detailsSection = doc.querySelector('div.hal-ea-studies-detail-bottom');
+  if (detailsSection) {
+    const ckTexts = detailsSection.querySelectorAll('.ck-text');
+    if (ckTexts.length > 0) {
+      const text = Array.from(ckTexts)
+        .map((el) => el.textContent?.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n\n');
+      return { description: text };
+    }
+  }
+
+  const main = doc.querySelector('main#hal-main-content') ?? doc.body;
+  const text = main.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  return { description: text };
 }

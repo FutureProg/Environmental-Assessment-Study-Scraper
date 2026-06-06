@@ -1,5 +1,22 @@
 export type EAStatus = 'on_going' | 'deferred' | 'completed' | 'unknown';
 
+export type MCAssessmentCategory =
+  | 'road_and_structure'
+  | 'transit'
+  | 'water_and_wastewater'
+  | 'waste_management'
+  | 'energy'
+  | 'other';
+
+export type ScopeResult = 'in_scope' | 'out_of_scope' | 'unclassified';
+
+export interface EAClassification {
+  mcCategory: MCAssessmentCategory;
+  mcCategoryReasoning: string;
+  scope: ScopeResult;
+  scopeReasoning: string;
+}
+
 export interface EAStudy {
   title: string;
   municipalityAreas: string[];  // one or more municipalities the study covers
@@ -11,8 +28,6 @@ export interface EAStudy {
   detail?: EAStudyDetail;
 }
 
-// Placeholder — fields TBD when engagement data extraction is implemented
-// deno-lint-ignore no-empty-interface
 export interface EAStudyDetail {
-  // e.g. consultationDates, engagementLinks, description
+  description: string;
 }
