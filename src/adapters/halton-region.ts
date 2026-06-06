@@ -1,5 +1,5 @@
 import { JSDOM } from 'jsdom';
-import type { EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
+import type { DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
 
 const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
@@ -145,30 +145,71 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
 }
 
 /**
- * Fetches a study's detail page and extracts descriptive content for classification.
+ * Fetches a study's detail page and extracts:
+ * - `description`: plain text from `.ck-text` elements (truncated, used for classification)
+ * - `engagementHtml`: raw inner HTML of those same `.ck-text` elements (preserves links, used for engagement extraction)
+ * - `documentLinks`: structured rows from `hal-ea-studies-listing` (title, URL, date label)
  *
- * Extraction priority:
- * 1. Text from `.ck-text` elements inside `div.hal-ea-studies-detail-bottom` (Purpose + Scope)
- * 2. Full `main#hal-main-content` text
- * 3. Body text as a last resort
+ * Falls back to full main/body text for `description` when the structured section is absent.
  */
 export async function fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail> {
   const dom = await JSDOM.fromURL(sourceUrl, { pretendToBeVisual: true });
   const doc = dom.window.document;
 
+  let description = '';
+  let engagementHtml = '';
+
   const detailsSection = doc.querySelector('div.hal-ea-studies-detail-bottom');
   if (detailsSection) {
     const ckTexts = detailsSection.querySelectorAll('.ck-text');
     if (ckTexts.length > 0) {
-      const text = Array.from(ckTexts)
+      description = Array.from(ckTexts)
         .map((el) => el.textContent?.replace(/\s+/g, ' ').trim())
         .filter(Boolean)
-        .join('\n\n');
-      return { description: text };
+        .join('\n\n')
+        .slice(0, 3000);
+      engagementHtml = Array.from(ckTexts)
+        .map((el) => el.innerHTML.trim())
+        .filter(Boolean)
+        .join('\n\n')
+        .replace(/href="(\/[^"]+)"/g, `href="${BASE_URL}$1"`);
     }
   }
 
-  const main = doc.querySelector('main#hal-main-content') ?? doc.body;
-  const text = main.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-  return { description: text };
+  if (!description) {
+    const main = doc.querySelector('main#hal-main-content') ?? doc.body;
+    description = main.textContent?.replace(/\s+/g, ' ').trim().slice(0, 3000) ?? '';
+  }
+
+  const documentLinks = extractDocumentLinks(doc);
+
+  return { description, engagementHtml, documentLinks };
+}
+
+/**
+ * Extracts structured document listing rows from `hal-ea-studies-listing`.
+ *
+ * Each row has a link (title + href) and an optional date label span.
+ * Relative hrefs are resolved to absolute URLs.
+ */
+function extractDocumentLinks(doc: Document): DocumentLink[] {
+  const rows = doc.querySelectorAll('.hal-ea-studies-listing-row');
+  const links: DocumentLink[] = [];
+
+  for (const row of rows) {
+    const anchor = row.querySelector('a');
+    if (!anchor) continue;
+
+    const title = anchor.textContent?.trim() ?? '';
+    const href = anchor.getAttribute('href') ?? '';
+    const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+    const dateEl = row.querySelector('.hal-ea-studies-listing-item-report-date');
+    const date = dateEl?.textContent?.trim() ?? null;
+
+    if (title && url) {
+      links.push({ title, url, date });
+    }
+  }
+
+  return links;
 }

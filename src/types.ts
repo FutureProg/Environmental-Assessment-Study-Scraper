@@ -7,6 +7,18 @@ export interface EAClassification {
   scopeReasoning: string;
 }
 
+export interface DocumentLink {
+  title: string;
+  url: string;
+  date: string | null;  // unparsed label from the listing, e.g. "August 2023"
+}
+
+export interface EAStudyDetail {
+  description: string;           // plain text, truncated to 3000 chars — used by classifyStudy()
+  engagementHtml: string;        // raw inner HTML of .ck-text sections — used by extractEngagementEvents()
+  documentLinks: DocumentLink[]; // structured rows from hal-ea-studies-listing — used by extractEngagementEvents()
+}
+
 export interface EAStudy {
   title: string;
   municipalityAreas: string[];  // one or more municipalities the study covers
@@ -14,10 +26,26 @@ export interface EAStudy {
   status: EAStatus;
   rawStatus: string;
   sourceUrl: string;
-  // TODO: populated by a future per-study page fetch (engagement data extraction)
   detail?: EAStudyDetail;
 }
 
-export interface EAStudyDetail {
-  description: string;
+export interface EngagementEvent {
+  type: 'open_house' | 'comment_deadline' | 'hearing' | 'document';
+  eventDate: string | null;  // ISO YYYY-MM-DD start date
+  endDate: string | null;    // ISO YYYY-MM-DD end date for ranges
+  location: string | null;
+  url: string | null;
+  notes: string | null;
+}
+
+export interface AssessmentDiff {
+  id: number;
+  title: string;
+  sourceUrl: string;
+  status: EAStatus;
+  scope: ScopeResult;
+  scopeReasoning: string;
+  isNew: boolean;
+  statusChanged?: { from: EAStatus; to: EAStatus };
+  scopeChanged?: { from: ScopeResult; to: ScopeResult };
 }

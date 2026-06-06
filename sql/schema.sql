@@ -104,18 +104,23 @@ CREATE TABLE environmental_assessments.engagement_events (
   study_id    INTEGER NOT NULL REFERENCES environmental_assessments.assessments (id) ON DELETE CASCADE,
   type        environmental_assessments.engagement_event_type NOT NULL,
   event_date  TIMESTAMPTZ,
+  end_date    TIMESTAMPTZ,
   location    TEXT,
   url         TEXT,
   notes       TEXT,
-  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  fingerprint TEXT NOT NULL DEFAULT '',
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT engagement_events_study_fingerprint_unique UNIQUE (study_id, fingerprint)
 );
 
-COMMENT ON COLUMN environmental_assessments.engagement_events.study_id   IS 'The assessment this event belongs to';
-COMMENT ON COLUMN environmental_assessments.engagement_events.type       IS 'Category of engagement opportunity';
-COMMENT ON COLUMN environmental_assessments.engagement_events.event_date IS 'Date and time of the event or deadline (null if unknown)';
-COMMENT ON COLUMN environmental_assessments.engagement_events.location   IS 'Physical address or venue name (null for online or deadline-only events)';
-COMMENT ON COLUMN environmental_assessments.engagement_events.url        IS 'Link to a registration page, comment form, or document';
-COMMENT ON COLUMN environmental_assessments.engagement_events.notes      IS 'Any additional context extracted from the study page';
+COMMENT ON COLUMN environmental_assessments.engagement_events.study_id    IS 'The assessment this event belongs to';
+COMMENT ON COLUMN environmental_assessments.engagement_events.type        IS 'Category of engagement opportunity';
+COMMENT ON COLUMN environmental_assessments.engagement_events.event_date  IS 'Start date/time of the event or consultation period (null if unknown)';
+COMMENT ON COLUMN environmental_assessments.engagement_events.end_date    IS 'End date/time for multi-day consultation periods (null if single day or unknown)';
+COMMENT ON COLUMN environmental_assessments.engagement_events.location    IS 'Physical address or venue name (null for online or deadline-only events)';
+COMMENT ON COLUMN environmental_assessments.engagement_events.url         IS 'Link to a registration page, comment form, or document';
+COMMENT ON COLUMN environmental_assessments.engagement_events.notes       IS 'Any additional context extracted from the study page';
+COMMENT ON COLUMN environmental_assessments.engagement_events.fingerprint IS 'Deduplication key: type:url:event_date — used to avoid reinserting known events';
 COMMENT ON COLUMN environmental_assessments.engagement_events.inserted_at IS 'When this record was created';
 
 CREATE INDEX engagement_events_study_id_idx   ON environmental_assessments.engagement_events (study_id);

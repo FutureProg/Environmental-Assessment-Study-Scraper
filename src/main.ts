@@ -1,6 +1,8 @@
 import { fetchHaltonRegionStudies, fetchStudyDetail } from './adapters/halton-region.ts';
 import { classifyStudy } from './classifier.ts';
-import { upsertAssessment, closeDb } from './db.ts';
+import { extractEngagementEvents } from './engagement.ts';
+import { upsertAssessment, syncEngagementEvents, closeDb } from './db.ts';
+import { sendDiscordChanges } from './discord.ts';
 
 async function main() {
   const studies = await fetchHaltonRegionStudies();
@@ -9,9 +11,19 @@ async function main() {
   for (const study of studies) {
     study.detail = await fetchStudyDetail(study.sourceUrl);
     const classification = await classifyStudy(study);
-    await upsertAssessment(study, classification);
+    const diff = await upsertAssessment(study, classification);
+
     console.log(`\n${study.title}`);
     console.log(`  Scope : ${classification.scope} — ${classification.scopeReasoning}`);
+
+    const engagementEvents = await extractEngagementEvents(study.detail);
+    const newEvents = await syncEngagementEvents(diff.id, engagementEvents);
+
+    if (newEvents.length > 0) {
+      console.log(`  Engagement: ${newEvents.length} new event(s)`);
+    }
+
+    await sendDiscordChanges(diff, newEvents);
   }
 
   await closeDb();
