@@ -18,7 +18,10 @@ const BROWSER_HEADERS = {
   'Cache-Control': 'max-age=0',
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function fetchDocument(url: string): Promise<Document> {
+  await sleep(1000);
   const response = await fetch(url, { headers: BROWSER_HEADERS });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
   const html = await response.text();
