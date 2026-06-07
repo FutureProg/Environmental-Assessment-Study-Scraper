@@ -118,8 +118,23 @@ function isUpcoming(event: EngagementEvent, studyStatus: string): boolean {
   return true;
 }
 
+const DATE_OPTS: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+const DT_OPTS: Intl.DateTimeFormatOptions = { ...DATE_OPTS, hour: 'numeric', minute: '2-digit' };
+
+function fmtSingle(s: string): string {
+  if (s.includes('T')) return Temporal.PlainDateTime.from(s).toLocaleString('en-CA', DT_OPTS);
+  return Temporal.PlainDate.from(s).toLocaleString('en-CA', DATE_OPTS);
+}
+
+function fmtWithDefault(s: string, defaultHour: number, defaultMin: number): string {
+  const dt = s.includes('T')
+    ? Temporal.PlainDateTime.from(s)
+    : Temporal.PlainDate.from(s).toPlainDateTime({ hour: defaultHour, minute: defaultMin });
+  return dt.toLocaleString('en-CA', DT_OPTS);
+}
+
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start && !end) return 'Date TBD';
-  if (!end) return start!;
-  return `${start} – ${end}`;
+  if (!end) return fmtSingle(start!);
+  return `${fmtWithDefault(start!, 0, 0)} – ${fmtWithDefault(end, 23, 59)}`;
 }

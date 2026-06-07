@@ -11,8 +11,8 @@ Also extract any published documents or reports linked or mentioned.
 
 For each event:
 - type: "open_house" for in-person/virtual public meetings and PICs; "comment_deadline" for comment submission deadlines; "hearing" for formal public hearings; "document" for published documents or reports (no public interaction required)
-- eventDate: ISO YYYY-MM-DD of the event or start of a period (null if not mentioned)
-- endDate: ISO YYYY-MM-DD end of a comment/consultation period (null if single day or unknown)
+- eventDate: ISO datetime of the event or start of a period — YYYY-MM-DDTHH:MM if a time is given, YYYY-MM-DD if only a date is given, null if not mentioned
+- endDate: ISO datetime end of a comment/consultation period — YYYY-MM-DDTHH:MM if a time is given, YYYY-MM-DD if only a date is given, null if single day or unknown
 - location: venue or "Online" for virtual events (null if unknown or not applicable)
 - url: direct URL to the event, consultation page, or document (null if not provided)
 - notes: document title or brief context, e.g. "PIC #2" or "30-day comment period"
@@ -63,8 +63,8 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
               type: 'object',
               properties: {
                 type:      { type: 'string', enum: ['open_house', 'comment_deadline', 'hearing', 'document'] },
-                eventDate: { type: ['string', 'null'], description: 'ISO YYYY-MM-DD start date, or null' },
-                endDate:   { type: ['string', 'null'], description: 'ISO YYYY-MM-DD end date for ranges, or null' },
+                eventDate: { type: ['string', 'null'], description: 'ISO start date/datetime: YYYY-MM-DDTHH:MM if time known, YYYY-MM-DD if date only, null if unknown' },
+                endDate:   { type: ['string', 'null'], description: 'ISO end date/datetime: YYYY-MM-DDTHH:MM if time known, YYYY-MM-DD if date only, null if single-day or unknown' },
                 location:  { type: ['string', 'null'] },
                 url:       { type: ['string', 'null'] },
                 notes:     { type: ['string', 'null'], description: 'Document title or brief event context' },

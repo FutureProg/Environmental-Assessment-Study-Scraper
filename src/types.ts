@@ -31,8 +31,8 @@ export interface EAStudy {
 
 export interface EngagementEvent {
   type: 'open_house' | 'comment_deadline' | 'hearing';
-  eventDate: string | null;  // ISO YYYY-MM-DD start date
-  endDate: string | null;    // ISO YYYY-MM-DD end date for ranges
+  eventDate: string | null;  // ISO date or datetime: YYYY-MM-DD or YYYY-MM-DDTHH:MM
+  endDate: string | null;    // ISO date or datetime for ranges: YYYY-MM-DD or YYYY-MM-DDTHH:MM
   location: string | null;
   url: string | null;
   notes: string | null;
