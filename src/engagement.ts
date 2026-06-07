@@ -7,17 +7,16 @@ const SYSTEM_PROMPT =
   `You are extracting public engagement events from Ontario Municipal Class Environmental Assessment (MC EA) study pages.
 
 Extract every public engagement opportunity mentioned in the HTML: open houses, Public Information Centres (PICs), comment periods, comment deadlines, public hearings, and online consultations.
-Also extract any published documents or reports linked or mentioned.
 
 For each event:
-- type: "open_house" for in-person/virtual public meetings and PICs; "comment_deadline" for comment submission deadlines; "hearing" for formal public hearings; "document" for published documents or reports (no public interaction required)
+- type: "open_house" for in-person/virtual public meetings and PICs; "comment_deadline" for comment submission deadlines; "hearing" for formal public hearings
 - eventDate: ISO datetime of the event or start of a period — YYYY-MM-DDTHH:MM if a time is given, YYYY-MM-DD if only a date is given, null if not mentioned
 - endDate: ISO datetime end of a comment/consultation period — YYYY-MM-DDTHH:MM if a time is given, YYYY-MM-DD if only a date is given, null if single day or unknown
 - location: venue or "Online" for virtual events (null if unknown or not applicable)
 - url: direct URL to the event, consultation page, or document (null if not provided)
 - notes: document title or brief context, e.g. "PIC #2" or "30-day comment period"
 
-Only extract events and documents explicitly mentioned in the text. Do not infer or guess.`;
+Only extract events explicitly mentioned in the text. Do not infer or guess.`;
 
 // Raw shape returned by Claude — includes 'document' which is split out before returning
 interface RawItem {
@@ -50,10 +49,10 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
   const response = await client.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: SYSTEM_PROMPT,    
     tools: [{
       name: 'extract_engagement_events',
-      description: 'Record all public engagement events and published documents found in this EA study page',
+      description: 'Record all public engagement events found in this EA study page',
       input_schema: {
         type: 'object' as const,
         properties: {
@@ -79,7 +78,7 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
     tool_choice: { type: 'tool', name: 'extract_engagement_events' },
     messages: [{
       role: 'user',
-      content: `Extract engagement events and documents from this EA study page HTML:\n\n${detail.engagementHtml}`,
+      content: `Extract engagement events from this EA study page HTML:\n\n${detail.engagementHtml}`,
     }],
   });
 
@@ -90,6 +89,12 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
 
   const events: EngagementEvent[] = [];
   const result = toolUse.input as { events: RawItem[] };
+  if (!result || !Array.isArray(result.events)) {
+    console.debug(response.content);
+    console.debug(detail.engagementHtml);
+    console.debug('Unexpected engagement extractor output:', toolUse.input);
+    throw new Error('Engagement extractor returned invalid data');
+  }
 
   for (const item of result.events) {
     if (item.type === 'document') {
