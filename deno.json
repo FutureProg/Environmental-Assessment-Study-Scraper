@@ -21,5 +21,11 @@
     "add": "npm:add@^2.0.6",
     "deno": "npm:deno@^2.8.2",
     "jsdom": "npm:jsdom@^29.1.1"
+  },
+  "deploy": {
+    "org": "nickmorrison",
+    "app": "ssh-ea-study-scraper"
   }
 }
+
+
