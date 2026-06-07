@@ -36,7 +36,7 @@ export async function sendDiscordChanges(
 
   if (diff.isNew && diff.scope === 'in_scope') {
     embeds.push({
-      title: 'New Environmental Assessment Found',
+      title: `NEW: ${diff.title}`,
       url: diff.sourceUrl,
       color: COLORS.green,
       fields: [
@@ -49,7 +49,7 @@ export async function sendDiscordChanges(
 
   if (!diff.isNew && diff.statusChanged && isRelevant) {
     embeds.push({
-      title: 'Environmental Assessment Status Changed',
+      title: `UPDATED: ${diff.title}`,
       url: diff.sourceUrl,
       color: COLORS.yellow,
       fields: [
@@ -62,7 +62,7 @@ export async function sendDiscordChanges(
 
   if (diff.scopeChanged?.to === 'in_scope') {
     embeds.push({
-      title: 'Environmental Assessment Now In Scope',
+      title: `UPDATED: ${diff.title}`,
       url: diff.sourceUrl,
       color: COLORS.blue,
       fields: [
@@ -77,7 +77,7 @@ export async function sendDiscordChanges(
     for (const event of newEngagementEvents) {
       if (!isUpcoming(event, diff.status)) continue;
       embeds.push({
-        title: 'New Public Engagement Announced',
+        title: `NEW: Public Engagement Announced for ${diff.title}`,
         url: event.url ?? diff.sourceUrl,
         color: COLORS.orange,
         fields: [
@@ -95,7 +95,7 @@ export async function sendDiscordChanges(
         .map((d) => d.publishedLabel ? `[${d.title}](${d.url}) — ${d.publishedLabel}` : `[${d.title}](${d.url})`)
         .join('\n');
       embeds.push({
-        title: 'New Documents Published',
+        title: `NEW: Documents Published for ${diff.title}`,
         url: diff.sourceUrl,
         color: COLORS.purple,
         fields: [
