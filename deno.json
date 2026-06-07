@@ -1,7 +1,8 @@
 {
   "tasks": {
-    "dev": "varlock run -- deno run --watch -P --unstable-cron main.ts"
+    "dev": "varlock run -- deno run --watch -P main.ts"
   },
+  "unstable": ["cron"],
   "permissions": {
     "default": {
       "read": true,
