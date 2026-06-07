@@ -27,6 +27,8 @@ export async function sendDiscordChanges(
   const isRelevant = diff.scope === 'in_scope' || diff.scopeChanged?.to === 'in_scope';
   if (!isRelevant && !diff.isNew) return;
 
+  const isNewlyCompleted = !diff.isNew && diff.statusChanged?.to === 'completed';
+
   const embeds: DiscordEmbed[] = [];
 
   if (diff.isNew && diff.scope === 'in_scope') {
@@ -82,7 +84,7 @@ export async function sendDiscordChanges(
       });
     }
 
-    if (newDocuments.length > 0) {
+    if (newDocuments.length > 0 && (diff.status !== 'completed' || isNewlyCompleted)) {
       const docList = newDocuments
         .map((d) => d.publishedLabel ? `[${d.title}](${d.url}) — ${d.publishedLabel}` : `[${d.title}](${d.url})`)
         .join('\n');
