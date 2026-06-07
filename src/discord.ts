@@ -44,7 +44,7 @@ export async function sendDiscordChanges(
       fields: [
         { name: 'Study', value: diff.title, inline: false },
         { name: 'Municipalities', value: diff.municipalities.join(', '), inline: false },
-        { name: 'Why In Scope', value: diff.scopeReasoning, inline: false },
+        { name: 'Summary', value: diff.scopeReasoning, inline: false },
       ],
     });
   }
@@ -70,7 +70,7 @@ export async function sendDiscordChanges(
       fields: [
         { name: 'Study', value: diff.title, inline: false },
         { name: 'Municipalities', value: diff.municipalities.join(', '), inline: false },
-        { name: 'Why In Scope', value: diff.scopeReasoning, inline: false },
+        { name: 'Summary', value: diff.scopeReasoning, inline: false },
       ],
     });
   }
