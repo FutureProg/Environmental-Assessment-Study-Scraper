@@ -4,6 +4,14 @@ import type { DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts
 const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
 const MUNICIPALITY_OWNER = 'Halton Region';
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+async function fetchDocument(url: string): Promise<Document> {
+  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  const html = await response.text();
+  return new JSDOM(html, { url, pretendToBeVisual: true }).window.document;
+}
 
 interface RawRow {
   title: string;
@@ -128,8 +136,8 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
   let page = 1;
 
   while (true) {
-    const dom = await JSDOM.fromURL(buildPageUrl(page), { pretendToBeVisual: true });
-    const rows = parseRows(dom.window.document);
+    const doc = await fetchDocument(buildPageUrl(page));
+    const rows = parseRows(doc);
 
     const newRows = rows.filter((r) => !seenUrls.has(r.sourceUrl));
 
@@ -153,8 +161,7 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
  * Falls back to full main/body text for `description` when the structured section is absent.
  */
 export async function fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail> {
-  const dom = await JSDOM.fromURL(sourceUrl, { pretendToBeVisual: true });
-  const doc = dom.window.document;
+  const doc = await fetchDocument(sourceUrl);
 
   let description = '';
   let engagementHtml = '';
