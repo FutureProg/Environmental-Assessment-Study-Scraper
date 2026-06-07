@@ -52,4 +52,5 @@ export async function cronHandler() {
   }
 
   await closeDb();
+  console.log('Done');
 }

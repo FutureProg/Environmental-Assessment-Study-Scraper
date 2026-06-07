@@ -26,8 +26,9 @@ export async function sendDiscordChanges(
 
   const isRelevant = diff.scope === 'in_scope' || diff.scopeChanged?.to === 'in_scope';
   if (!isRelevant && !diff.isNew) return;
-
   const isNewlyCompleted = !diff.isNew && diff.statusChanged?.to === 'completed';
+  if (!isNewlyCompleted && diff.status === 'completed') return;
+  if (!diff.isNew && diff.statusChanged?.to !== 'deferred' && diff.status === 'deferred') return; // skip if study is deferred (but not just changed to deferred)
 
   const embeds: DiscordEmbed[] = [];
 
