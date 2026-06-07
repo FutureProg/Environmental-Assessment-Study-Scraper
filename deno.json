@@ -3,6 +3,7 @@
     "dev": "varlock run -- deno run --watch -P main.ts"
   },
   "unstable": ["cron"],
+  "nodeModulesDir": "auto",
   "permissions": {
     "default": {
       "read": true,
