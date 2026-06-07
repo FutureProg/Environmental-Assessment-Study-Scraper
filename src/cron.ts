@@ -11,7 +11,7 @@ export async function cronHandler() {
   for (const study of studies) {
     study.detail = await fetchStudyDetail(study.sourceUrl);
 
-    const stored = await getStoredAssessment(study.title, study.municipalityOwner);
+    const stored = await getStoredAssessment(study.title, study.municipalityOwner, study.sourceUrl);
     const contentChanged = stored === null || stored.contentHash !== study.detail.contentHash;
 
     const classification = contentChanged

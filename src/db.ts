@@ -19,13 +19,13 @@ function getSql() {
   return _sql;
 }
 
-export async function getStoredAssessment(title: string, owner: string): Promise<StoredAssessment | null> {
+export async function getStoredAssessment(title: string, owner: string, sourceUrl: string): Promise<StoredAssessment | null> {
   const sql = getSql();
   const [row] = await sql<{ content_hash: string | null; scope: ScopeResult; scope_reasoning: string | null }[]>`
     SELECT a.content_hash, a.scope, a.scope_reasoning
     FROM environmental_assessments.assessments a
     JOIN environmental_assessments.municipalities m ON m.id = a.municipality_owner
-    WHERE a.title = ${title} AND m.name = ${owner}
+    WHERE a.title = ${title} AND m.name = ${owner} AND a.source_url = ${sourceUrl}
   `;
   if (!row) return null;
   return { contentHash: row.content_hash, scope: row.scope, scopeReasoning: row.scope_reasoning };
@@ -43,7 +43,7 @@ export async function upsertAssessment(
     SELECT a.id, a.status, a.scope
     FROM environmental_assessments.assessments a
     JOIN environmental_assessments.municipalities m ON m.id = a.municipality_owner
-    WHERE a.title = ${study.title} AND m.name = ${study.municipalityOwner}
+    WHERE a.title = ${study.title} AND m.name = ${study.municipalityOwner} AND a.source_url = ${study.sourceUrl}
   `;
 
   const [row] = await sql<{ id: number; is_new: boolean }[]>`
