@@ -1,15 +1,24 @@
 import postgres from 'postgres';
 import type { AssessmentDiff, EngagementEvent, EAStatus, EAStudy, EAClassification, ScopeResult } from './types.ts';
 
-const cert = Deno.env.get('DATABASE_CERT');
-const sql = postgres(Deno.env.get('DATABASE_URL')!, {
-  ssl: cert ? { ca: cert } : undefined,
-});
+let _sql: ReturnType<typeof postgres> | null = null;
+
+function getSql() {
+  if (!_sql) {
+    const cert = Deno.env.get('DATABASE_CERT');
+    _sql = postgres(Deno.env.get('DATABASE_URL')!, {
+      ssl: cert ? { ca: cert } : undefined,
+    });
+  }
+  return _sql;
+}
 
 export async function upsertAssessment(
   study: EAStudy,
   classification: EAClassification,
 ): Promise<AssessmentDiff> {
+  const sql = getSql();
+
   // Capture existing state before upsert for change detection
   const [existing] = await sql<{ id: number; status: string; scope: string }[]>`
     SELECT a.id, a.status, a.scope
@@ -76,6 +85,8 @@ export async function syncEngagementEvents(
 ): Promise<EngagementEvent[]> {
   if (events.length === 0) return [];
 
+  const sql = getSql();
+
   const rows = events.map((e) => ({
     study_id:    assessmentId,
     type:        e.type,
@@ -99,5 +110,6 @@ export async function syncEngagementEvents(
 }
 
 export async function closeDb(): Promise<void> {
-  await sql.end();
+  await _sql?.end();
+  _sql = null;
 }
