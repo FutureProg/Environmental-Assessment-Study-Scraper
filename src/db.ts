@@ -162,6 +162,6 @@ export async function syncDocuments(
 }
 
 export async function closeDb(): Promise<void> {
-  await _sql?.end();
+  await _sql?.end({timeout: 5});
   _sql = null;
 }
