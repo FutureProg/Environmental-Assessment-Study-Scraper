@@ -29,9 +29,12 @@ async function main() {
   await closeDb();
 }
 
-await main();
-
 // Execute at 6PM every day
 Deno.cron("Halton Region Environmental Assessments", '0 18 * * *', async () => {
   await main();
 });
+
+// In local dev there's no cron runtime, so run once immediately
+if (!Deno.env.get('DENO_DEPLOYMENT_ID')) {
+  await main();
+}
