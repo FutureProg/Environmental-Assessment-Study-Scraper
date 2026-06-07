@@ -32,7 +32,7 @@ export async function cronHandler() {
       console.log(newDocuments.map((d) => `    - ${d.title} (${d.url})`).join('\n'));
     }
 
-    await sendDiscordChanges(diff, newEvents);
+    await sendDiscordChanges(diff, newEvents, newDocuments);
   }
 
   await closeDb();

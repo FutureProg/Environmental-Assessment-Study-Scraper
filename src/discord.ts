@@ -1,10 +1,11 @@
-import type { AssessmentDiff, EngagementEvent } from './types.ts';
+import type { AssessmentDiff, EngagementEvent, StudyDocument } from './types.ts';
 
 const COLORS = {
   green:  0x2ecc71,
   yellow: 0xf1c40f,
   blue:   0x3498db,
   orange: 0xe67e22,
+  purple: 0x9b59b6,
 };
 
 interface DiscordEmbed {
@@ -18,6 +19,7 @@ interface DiscordEmbed {
 export async function sendDiscordChanges(
   diff: AssessmentDiff,
   newEngagementEvents: EngagementEvent[],
+  newDocuments: StudyDocument[],
 ): Promise<void> {
   const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
   if (!webhookUrl) return;
@@ -76,6 +78,21 @@ export async function sendDiscordChanges(
           { name: 'Date', value: formatDateRange(event.eventDate, event.endDate), inline: true },
           ...(event.location ? [{ name: 'Location', value: event.location, inline: true }] : []),
           ...(event.notes ? [{ name: 'Notes', value: event.notes, inline: false }] : []),
+        ],
+      });
+    }
+
+    if (newDocuments.length > 0) {
+      const docList = newDocuments
+        .map((d) => d.publishedLabel ? `[${d.title}](${d.url}) — ${d.publishedLabel}` : `[${d.title}](${d.url})`)
+        .join('\n');
+      embeds.push({
+        title: 'New Documents Published',
+        url: diff.sourceUrl,
+        color: COLORS.purple,
+        fields: [
+          { name: 'Study', value: diff.title, inline: false },
+          { name: 'Documents', value: docList, inline: false },
         ],
       });
     }
