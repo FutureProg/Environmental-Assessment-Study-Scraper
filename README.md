@@ -90,17 +90,17 @@ Halton Hills has a structured listing with rich metadata (consultant, contact, P
 
 > **Note on status accuracy:** Status fields are inconsistently structured across municipalities — Halton Region uses discrete values (`On-going`, `Deferred`, `Completed`), while others embed status in free-form text or omit it from the listing page entirely. The scraper records whatever is shown and tracks changes over time, but manual verification is recommended for any study where the status seems unexpectedly stale.
 
-## 📅 Engagement Data Extraction *(planned)*
+## 📅 Engagement Data Extraction
 
-Where available, each EA study's individual page will be scraped for:
+Where available, each EA study's individual page is scraped for:
 - **Public consultation dates and times** — open houses, comment deadlines, or hearing dates
 - **Engagement links** — registration pages, online comment forms, or document downloads
 
 This information is unstructured and inconsistently formatted across municipalities. For example, Milton's individual study pages include full public open house schedules (date, time, location, comment deadline) and links to platforms like "Let's Talk Milton", while Halton Hills pages list PIC dates and consultant contacts. Burlington embeds timeline information in news post body text with no consistent structure.
 
-Because no two municipalities format this data the same way, extraction will likely be handled by a language model rather than fixed selectors. The specific approach has not yet been decided.
+Because no two municipalities format this data the same way, extraction is handled by Claude Haiku using a forced tool call to produce structured output — the same pattern used for scope classification.
 
-Extracted engagement data will be included in Discord notifications so Safe Streets Halton members have everything they need to participate without leaving the alert.
+Extracted engagement data is stored in the `engagement_events` table and included in Discord notifications for upcoming events, so Safe Streets Halton members have everything they need to participate without leaving the alert. Past events and events belonging to completed studies are stored but do not trigger notifications.
 
 ## 🛠️ Tech Stack
 - [Deno](https://deno.com/) + TypeScript
@@ -139,6 +139,7 @@ Set the required environment variables:
 ```bash
 export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 export DATABASE_URL=postgresql://...
+export DATABASE_CERT="-----BEGIN CERTIFICATE-----..."
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
