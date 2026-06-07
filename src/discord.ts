@@ -33,8 +33,10 @@ export async function sendDiscordChanges(
   if (!diff.isNew && diff.statusChanged?.to !== 'deferred' && diff.status === 'deferred') return; // skip if study is deferred (but not just changed to deferred)
 
   const embeds: DiscordEmbed[] = [];
+  let shouldMentionRole = false;
 
   if (diff.isNew && diff.scope === 'in_scope') {
+    shouldMentionRole = true;
     embeds.push({
       title: `NEW: ${diff.title}`,
       url: diff.sourceUrl,
@@ -76,6 +78,7 @@ export async function sendDiscordChanges(
   if (isRelevant) {
     for (const event of newEngagementEvents) {
       if (!isUpcoming(event, diff.status)) continue;
+      shouldMentionRole = true;
       embeds.push({
         title: `NEW: Public Engagement Announced for ${diff.title}`,
         url: event.url ?? diff.sourceUrl,
@@ -108,12 +111,17 @@ export async function sendDiscordChanges(
 
   if (embeds.length === 0) return;
 
+  const roleId = Deno.env.get('DISCORD_NOTIFICATION_ROLE_ID');
+  const mention = shouldMentionRole && roleId ? `<@&${roleId}>` : undefined;
+
   // Discord allows max 10 embeds per message; split if needed
   for (let i = 0; i < embeds.length; i += 10) {
+    const payload: Record<string, unknown> = { embeds: embeds.slice(i, i + 10) };
+    if (i === 0 && mention) payload.content = mention;
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ embeds: embeds.slice(i, i + 10) }),
+      body: JSON.stringify(payload),
     });
   }
 }
