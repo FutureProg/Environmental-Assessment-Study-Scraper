@@ -1,8 +1,8 @@
-import { fetchHaltonRegionStudies, fetchStudyDetail } from './adapters/halton-region.ts';
-import { classifyStudy } from './classifier.ts';
-import { extractEngagementEvents } from './engagement.ts';
-import { upsertAssessment, syncEngagementEvents, closeDb } from './db.ts';
-import { sendDiscordChanges } from './discord.ts';
+import { fetchHaltonRegionStudies, fetchStudyDetail } from './src/adapters/halton-region.ts';
+import { classifyStudy } from './src/classifier.ts';
+import { extractEngagementEvents } from './src/engagement.ts';
+import { upsertAssessment, syncEngagementEvents, closeDb } from './src/db.ts';
+import { sendDiscordChanges } from './src/discord.ts';
 
 async function main() {
   const studies = await fetchHaltonRegionStudies();
