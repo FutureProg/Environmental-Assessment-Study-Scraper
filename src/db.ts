@@ -1,6 +1,12 @@
 import postgres from 'postgres';
 import type { AssessmentDiff, EngagementEvent, StudyDocument, EAStatus, EAStudy, EAClassification, ScopeResult } from './types.ts';
 
+export interface StoredAssessment {
+  contentHash: string | null;
+  scope: ScopeResult;
+  scopeReasoning: string | null;
+}
+
 let _sql: ReturnType<typeof postgres> | null = null;
 
 function getSql() {
@@ -13,9 +19,22 @@ function getSql() {
   return _sql;
 }
 
+export async function getStoredAssessment(title: string, owner: string): Promise<StoredAssessment | null> {
+  const sql = getSql();
+  const [row] = await sql<{ content_hash: string | null; scope: ScopeResult; scope_reasoning: string | null }[]>`
+    SELECT a.content_hash, a.scope, a.scope_reasoning
+    FROM environmental_assessments.assessments a
+    JOIN environmental_assessments.municipalities m ON m.id = a.municipality_owner
+    WHERE a.title = ${title} AND m.name = ${owner}
+  `;
+  if (!row) return null;
+  return { contentHash: row.content_hash, scope: row.scope, scopeReasoning: row.scope_reasoning };
+}
+
 export async function upsertAssessment(
   study: EAStudy,
   classification: EAClassification,
+  contentHash: string,
 ): Promise<AssessmentDiff> {
   const sql = getSql();
 
@@ -30,7 +49,7 @@ export async function upsertAssessment(
   const [row] = await sql<{ id: number; is_new: boolean }[]>`
     INSERT INTO environmental_assessments.assessments
       (title, municipality_owner, municipality_areas, source_url,
-       status, raw_status, scope, scope_reasoning, last_seen_at)
+       status, raw_status, scope, scope_reasoning, content_hash, last_seen_at)
     VALUES (
       ${study.title},
       (SELECT id FROM environmental_assessments.municipalities WHERE name = ${study.municipalityOwner}),
@@ -40,6 +59,7 @@ export async function upsertAssessment(
       ${study.rawStatus},
       ${classification.scope}::environmental_assessments.ea_scope,
       ${classification.scopeReasoning},
+      ${contentHash},
       NOW()
     )
     ON CONFLICT (title, municipality_owner) DO UPDATE SET
@@ -49,6 +69,7 @@ export async function upsertAssessment(
       raw_status         = EXCLUDED.raw_status,
       scope              = EXCLUDED.scope,
       scope_reasoning    = EXCLUDED.scope_reasoning,
+      content_hash       = EXCLUDED.content_hash,
       last_seen_at       = EXCLUDED.last_seen_at
     RETURNING id, (xmax = 0) AS is_new
   `;

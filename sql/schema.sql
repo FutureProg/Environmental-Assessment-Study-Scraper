@@ -62,6 +62,7 @@ CREATE TABLE environmental_assessments.assessments (
   scope              environmental_assessments.ea_scope NOT NULL DEFAULT 'unclassified',
   scope_reasoning    TEXT,
   engagement_data    JSONB,
+  content_hash       TEXT,
   last_seen_at       TIMESTAMPTZ,
   inserted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -78,6 +79,7 @@ COMMENT ON COLUMN environmental_assessments.assessments.raw_status      IS 'Verb
 COMMENT ON COLUMN environmental_assessments.assessments.scope           IS 'Whether this study is relevant to Safe Streets Halton, as determined by Claude';
 COMMENT ON COLUMN environmental_assessments.assessments.scope_reasoning IS 'Claude''s explanation for the scope classification';
 COMMENT ON COLUMN environmental_assessments.assessments.engagement_data IS 'Unstructured engagement info extracted from the study page (dates, links, etc.)';
+COMMENT ON COLUMN environmental_assessments.assessments.content_hash    IS 'SHA-256 hex digest of the detail page content (.hal-ea-studies-detail + .resource-listing-eastudies). Used to skip re-classification when content is unchanged.';
 COMMENT ON COLUMN environmental_assessments.assessments.last_seen_at    IS 'Last time the scraper confirmed this study still appears on the listing page';
 COMMENT ON COLUMN environmental_assessments.assessments.inserted_at     IS 'When this record was first created';
 COMMENT ON COLUMN environmental_assessments.assessments.updated_at      IS 'When this record was last modified — maintained automatically by trigger';

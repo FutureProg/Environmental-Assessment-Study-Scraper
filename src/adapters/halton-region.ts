@@ -167,11 +167,19 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
   return groupIntoStudies(allRows);
 }
 
+async function computeContentHash(doc: Document): Promise<string> {
+  const detail = doc.querySelector('.hal-ea-studies-detail')?.innerHTML ?? '';
+  const resources = doc.querySelector('.resource-listing-eastudies')?.innerHTML ?? '';
+  const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(detail + resources));
+  return Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /**
  * Fetches a study's detail page and extracts:
  * - `description`: plain text from `.ck-text` elements (truncated, used for classification)
  * - `engagementHtml`: raw inner HTML of those same `.ck-text` elements (preserves links, used for engagement extraction)
  * - `documentLinks`: structured rows from `hal-ea-studies-listing` (title, URL, date label)
+ * - `contentHash`: SHA-256 of `.hal-ea-studies-detail` + `.resource-listing-eastudies` innerHTML
  *
  * Falls back to full main/body text for `description` when the structured section is absent.
  */
@@ -204,8 +212,9 @@ export async function fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail
   }
 
   const documentLinks = extractDocumentLinks(doc);
+  const contentHash = await computeContentHash(doc);
 
-  return { description, engagementHtml, documentLinks };
+  return { description, engagementHtml, documentLinks, contentHash };
 }
 
 /**

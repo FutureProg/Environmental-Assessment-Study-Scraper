@@ -17,6 +17,7 @@ export interface EAStudyDetail {
   description: string;           // plain text, truncated to 3000 chars — used by classifyStudy()
   engagementHtml: string;        // raw inner HTML of .ck-text sections — used by extractEngagementEvents()
   documentLinks: DocumentLink[]; // structured rows from hal-ea-studies-listing — used by extractEngagementEvents()
+  contentHash: string;           // SHA-256 of .hal-ea-studies-detail + .resource-listing-eastudies innerHTML
 }
 
 export interface EAStudy {
