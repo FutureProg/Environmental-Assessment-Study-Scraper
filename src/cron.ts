@@ -20,7 +20,10 @@ export async function cronHandler() {
     const newEvents = await syncEngagementEvents(diff.id, engagementEvents);
 
     if (newEvents.length > 0) {
-      console.log(`  Engagement: ${newEvents.length} new event(s)`);
+      console.log(`  Engagement: ${newEvents.length} new item(s)`);
+      const eventTypes = new Set(newEvents.map((e) => e.type));      
+      eventTypes.forEach((type) => console.log(`    - ${type}: ${newEvents.filter((e) => e.type === type).length} new event(s)`));
+      console.log(newEvents.map((e) => `    - ${e.type} on ${e.eventDate} (${e.url})`).join('\n'));
     }
 
     await sendDiscordChanges(diff, newEvents);
