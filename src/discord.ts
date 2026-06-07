@@ -36,11 +36,12 @@ export async function sendDiscordChanges(
 
   if (diff.isNew && diff.scope === 'in_scope') {
     embeds.push({
-      title: 'New In-Scope EA Study Found',
+      title: 'New Environmental Assessment Found',
       url: diff.sourceUrl,
       color: COLORS.green,
       fields: [
         { name: 'Study', value: diff.title, inline: false },
+        { name: 'Municipalities', value: diff.municipalities.join(', '), inline: false },
         { name: 'Why In Scope', value: diff.scopeReasoning, inline: false },
       ],
     });
@@ -48,11 +49,12 @@ export async function sendDiscordChanges(
 
   if (!diff.isNew && diff.statusChanged && isRelevant) {
     embeds.push({
-      title: 'EA Study Status Changed',
+      title: 'Environmental Assessment Status Changed',
       url: diff.sourceUrl,
       color: COLORS.yellow,
       fields: [
         { name: 'Study', value: diff.title, inline: false },
+        { name: 'Municipalities', value: diff.municipalities.join(', '), inline: false },
         { name: 'Status', value: `${formatStatus(diff.statusChanged.from)} → ${formatStatus(diff.statusChanged.to)}`, inline: true },
       ],
     });
@@ -60,11 +62,12 @@ export async function sendDiscordChanges(
 
   if (diff.scopeChanged?.to === 'in_scope') {
     embeds.push({
-      title: 'EA Study Now In Scope',
+      title: 'Environmental Assessment Now In Scope',
       url: diff.sourceUrl,
       color: COLORS.blue,
       fields: [
         { name: 'Study', value: diff.title, inline: false },
+        { name: 'Municipalities', value: diff.municipalities.join(', '), inline: false },
         { name: 'Why In Scope', value: diff.scopeReasoning, inline: false },
       ],
     });

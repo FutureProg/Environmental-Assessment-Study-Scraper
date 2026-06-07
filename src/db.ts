@@ -80,6 +80,7 @@ export async function upsertAssessment(
     sourceUrl: study.sourceUrl,
     status: study.status,
     scope: classification.scope,
+    municipalities: study.municipalityAreas,
     scopeReasoning: classification.scopeReasoning,
     isNew: row.is_new,
   };

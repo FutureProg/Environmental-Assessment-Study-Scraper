@@ -47,6 +47,7 @@ export interface StudyDocument {
 
 export interface AssessmentDiff {
   id: number;
+  municipalities: string[];
   title: string;
   sourceUrl: string;
   status: EAStatus;

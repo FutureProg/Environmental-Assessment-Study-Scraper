@@ -16,4 +16,5 @@ if (Deno.env.get('DENO_DEPLOYMENT_ID')) {
 } else {
   // In local dev there's no cron runtime, so run once immediately.
   await cronHandler();
+  Deno.exit();
 }
