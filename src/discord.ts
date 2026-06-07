@@ -27,6 +27,7 @@ export async function sendDiscordChanges(
   const isRelevant = diff.scope === 'in_scope' || diff.scopeChanged?.to === 'in_scope';
   if (!isRelevant && !diff.isNew) return;
   if (diff.isNew && diff.status === 'completed') return; // skip new studies that are already completed
+  if (diff.isNew && diff.status === 'deferred') return; // skip new studies that are already deferred
   const isNewlyCompleted = !diff.isNew && diff.statusChanged?.to === 'completed';
   if (!isNewlyCompleted && diff.status === 'completed') return;
   if (!diff.isNew && diff.statusChanged?.to !== 'deferred' && diff.status === 'deferred') return; // skip if study is deferred (but not just changed to deferred)
