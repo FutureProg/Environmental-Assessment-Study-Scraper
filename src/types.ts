@@ -30,12 +30,18 @@ export interface EAStudy {
 }
 
 export interface EngagementEvent {
-  type: 'open_house' | 'comment_deadline' | 'hearing' | 'document';
+  type: 'open_house' | 'comment_deadline' | 'hearing';
   eventDate: string | null;  // ISO YYYY-MM-DD start date
   endDate: string | null;    // ISO YYYY-MM-DD end date for ranges
   location: string | null;
   url: string | null;
   notes: string | null;
+}
+
+export interface StudyDocument {
+  title: string;
+  url: string;
+  publishedLabel: string | null;  // unparsed label from the listing, e.g. "August 2023"
 }
 
 export interface AssessmentDiff {

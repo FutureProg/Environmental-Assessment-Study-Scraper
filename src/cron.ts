@@ -1,7 +1,7 @@
 import { fetchHaltonRegionStudies, fetchStudyDetail } from './adapters/halton-region.ts';
 import { classifyStudy } from './classifier.ts';
-import { extractEngagementEvents } from './engagement.ts';
-import { upsertAssessment, syncEngagementEvents, closeDb } from './db.ts';
+import { extractEngagementData } from './engagement.ts';
+import { upsertAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
 import { sendDiscordChanges } from './discord.ts';
 
 export async function cronHandler() {
@@ -16,14 +16,20 @@ export async function cronHandler() {
     console.log(`\n${study.title}`);
     console.log(`  Scope : ${classification.scope} — ${classification.scopeReasoning}`);
 
-    const engagementEvents = await extractEngagementEvents(study.detail);
+    const { events: engagementEvents, documents } = await extractEngagementData(study.detail);
     const newEvents = await syncEngagementEvents(diff.id, engagementEvents);
+    const newDocuments = await syncDocuments(diff.id, documents);
 
     if (newEvents.length > 0) {
-      console.log(`  Engagement: ${newEvents.length} new item(s)`);
+      console.log(`  Engagement: ${newEvents.length} new event(s)`);
       const eventTypes = new Set(newEvents.map((e) => e.type));      
       eventTypes.forEach((type) => console.log(`    - ${type}: ${newEvents.filter((e) => e.type === type).length} new event(s)`));
       console.log(newEvents.map((e) => `    - ${e.type} on ${e.eventDate} (${e.url})`).join('\n'));
+    }
+
+    if (newDocuments.length > 0) {
+      console.log(`  Documents: ${newDocuments.length} new document(s)`);
+      console.log(newDocuments.map((d) => `    - ${d.title} (${d.url})`).join('\n'));
     }
 
     await sendDiscordChanges(diff, newEvents);

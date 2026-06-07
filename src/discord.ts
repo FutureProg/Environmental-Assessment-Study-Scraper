@@ -65,7 +65,6 @@ export async function sendDiscordChanges(
 
   if (isRelevant) {
     for (const event of newEngagementEvents) {
-      if (event.type === 'document') continue;
       if (!isUpcoming(event, diff.status)) continue;
       embeds.push({
         title: 'New Public Engagement Announced',

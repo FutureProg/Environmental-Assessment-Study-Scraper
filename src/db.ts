@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { AssessmentDiff, EngagementEvent, EAStatus, EAStudy, EAClassification, ScopeResult } from './types.ts';
+import type { AssessmentDiff, EngagementEvent, StudyDocument, EAStatus, EAStudy, EAClassification, ScopeResult } from './types.ts';
 
 let _sql: ReturnType<typeof postgres> | null = null;
 
@@ -107,6 +107,37 @@ export async function syncEngagementEvents(
 
   const newFingerprints = new Set(inserted.map((r) => r.fingerprint));
   return events.filter((e) => newFingerprints.has(`${e.type}:${e.url ?? ''}:${e.eventDate ?? ''}`));
+}
+
+/**
+ * Inserts documents for an assessment, skipping any that already exist
+ * (matched by study_id + fingerprint). Returns only the newly inserted documents.
+ */
+export async function syncDocuments(
+  assessmentId: number,
+  documents: StudyDocument[],
+): Promise<StudyDocument[]> {
+  if (documents.length === 0) return [];
+
+  const sql = getSql();
+
+  const rows = documents.map((d) => ({
+    study_id:        assessmentId,
+    url:             d.url,
+    title:           d.title,
+    published_label: d.publishedLabel ?? null,
+    fingerprint:     d.url,
+  }));
+
+  const inserted = await sql<{ fingerprint: string }[]>`
+    INSERT INTO environmental_assessments.documents
+      ${sql(rows, 'study_id', 'url', 'title', 'published_label', 'fingerprint')}
+    ON CONFLICT (study_id, fingerprint) DO NOTHING
+    RETURNING fingerprint
+  `;
+
+  const newFingerprints = new Set(inserted.map((r) => r.fingerprint));
+  return documents.filter((d) => newFingerprints.has(d.url));
 }
 
 export async function closeDb(): Promise<void> {

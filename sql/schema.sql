@@ -20,8 +20,7 @@ CREATE TYPE environmental_assessments.ea_scope AS ENUM (
 CREATE TYPE environmental_assessments.engagement_event_type AS ENUM (
   'open_house',
   'comment_deadline',
-  'hearing',
-  'document'
+  'hearing'
 );
 
 -- ============================================================
@@ -125,4 +124,29 @@ COMMENT ON COLUMN environmental_assessments.engagement_events.inserted_at IS 'Wh
 
 CREATE INDEX engagement_events_study_id_idx   ON environmental_assessments.engagement_events (study_id);
 CREATE INDEX engagement_events_event_date_idx ON environmental_assessments.engagement_events (event_date);
+
+-- ============================================================
+-- documents
+-- ============================================================
+
+CREATE TABLE environmental_assessments.documents (
+  id              SERIAL PRIMARY KEY,
+  study_id        INTEGER NOT NULL REFERENCES environmental_assessments.assessments (id) ON DELETE CASCADE,
+  url             TEXT NOT NULL,
+  title           TEXT,
+  published_label TEXT,
+  fingerprint     TEXT NOT NULL,
+  inserted_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT documents_study_fingerprint_unique UNIQUE (study_id, fingerprint)
+);
+
+COMMENT ON TABLE  environmental_assessments.documents                 IS 'Published documents and reports associated with an EA study';
+COMMENT ON COLUMN environmental_assessments.documents.study_id        IS 'The assessment this document belongs to';
+COMMENT ON COLUMN environmental_assessments.documents.url             IS 'Direct link to the document or document listing page';
+COMMENT ON COLUMN environmental_assessments.documents.title           IS 'Display name of the document as it appears on the study page';
+COMMENT ON COLUMN environmental_assessments.documents.published_label IS 'Unparsed publication date label scraped from the website, e.g. "August 2023"';
+COMMENT ON COLUMN environmental_assessments.documents.fingerprint     IS 'Deduplication key: url — used to avoid reinserting known documents';
+COMMENT ON COLUMN environmental_assessments.documents.inserted_at     IS 'When this record was created';
+
+CREATE INDEX documents_study_id_idx ON environmental_assessments.documents (study_id);
 
