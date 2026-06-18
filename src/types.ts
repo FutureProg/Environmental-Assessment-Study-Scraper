@@ -5,6 +5,7 @@ export type ScopeResult = 'in_scope' | 'out_of_scope' | 'unclassified';
 export interface EAClassification {
   scope: ScopeResult;
   scopeReasoning: string;
+  status?: EAStatus;  // only populated when classifyStudy is called with inferStatus
 }
 
 export interface DocumentLink {
@@ -43,6 +44,22 @@ export interface StudyDocument {
   title: string;
   url: string;
   publishedLabel: string | null;  // unparsed label from the listing, e.g. "August 2023"
+}
+
+/**
+ * A municipality scraper. Each source has its own adapter that knows how to list
+ * its EA studies and fetch an individual study's detail page.
+ *
+ * `inferStatus` is true for sources whose listing has no structured status field
+ * (e.g. Oakville) — for these, status is inferred by Claude during classification
+ * rather than scraped. Sources with an authoritative status column (e.g. Halton
+ * Region) set it false.
+ */
+export interface Adapter {
+  municipalityOwner: string;
+  inferStatus: boolean;
+  fetchStudies(): Promise<EAStudy[]>;
+  fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail>;
 }
 
 export interface AssessmentDiff {

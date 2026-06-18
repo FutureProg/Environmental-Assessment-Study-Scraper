@@ -18,13 +18,18 @@ The `dev` task expands to: `varlock run -- deno run --watch -P --unstable-cron s
 
 The scraper runs as a single Deno script (`src/main.ts`) that immediately executes on startup and also registers a `Deno.cron` trigger for scheduled runs on Deno Deploy.
 
-**Data flow:**
-1. `fetchHaltonRegionStudies()` — paginates through Halton Region's listing table, returns deduplicated `EAStudy[]`
-2. `fetchStudyDetail(url)` — fetches each study's individual page for description text
-3. `classifyStudy(study)` — sends title + description to Claude Haiku with forced `tool_use` to classify scope
+**Data flow (per municipality, see `src/cron.ts`):**
+1. `adapter.fetchStudies()` — returns the municipality's `EAStudy[]`
+2. `adapter.fetchStudyDetail(url)` — fetches each study's individual page for description, document links, and a content hash
+3. `classifyStudy(study, { inferStatus })` — sends title + description to Claude Haiku with forced `tool_use` to classify scope (and, when `inferStatus` is set, the study's status)
 4. `upsertAssessment(study, classification)` — inserts or updates the record in PostgreSQL
 
-**Adapter pattern (`src/adapters/`):** Each municipality requires its own adapter. Only `halton-region.ts` is implemented. New adapters should export `fetchStudies(): Promise<EAStudy[]>` and follow the same dedup/grouping approach.
+**Adapter pattern (`src/adapters/`):** Each municipality has its own adapter conforming to the `Adapter` interface (`src/types.ts`): `municipalityOwner`, `inferStatus`, `fetchStudies()`, and `fetchStudyDetail()`. Implemented adapters are registered in `src/adapters/index.ts`, and `cronHandler` loops over them. Shared fetch/hash helpers live in `src/adapters/http.ts`.
+
+- `halton-region.ts` — paginated table with a structured status column (`inferStatus: false`); merges cross-municipality duplicate rows.
+- `oakville.ts` — single un-paginated page of `.widget-page-cards a.card`; no status field, so `inferStatus: true` and Claude infers status from the detail page during classification.
+
+**Inferred status:** Sources without a structured status set `inferStatus: true`. The classifier then returns a `status` field alongside scope. When a study's detail content is unchanged between runs (same `content_hash`), re-classification is skipped — for `inferStatus` adapters the cron preserves the previously stored status rather than overwriting it with the adapter's placeholder `'unknown'`.
 
 **Halton Region pagination quirk:** The site repeats the last page instead of returning empty results past the end. Pagination stops when every URL on a fetched page has already been seen (tracked via `seenUrls` Set), not when an empty page is returned.
 

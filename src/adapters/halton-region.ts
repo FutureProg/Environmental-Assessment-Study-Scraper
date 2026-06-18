@@ -1,32 +1,9 @@
-import { JSDOM } from 'jsdom';
-import type { DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
+import type { Adapter, DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
+import { fetchDocument, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
 const MUNICIPALITY_OWNER = 'Halton Region';
-const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-
-const BROWSER_HEADERS = {
-  'User-Agent': USER_AGENT,
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-CA,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Upgrade-Insecure-Requests': '1',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Cache-Control': 'max-age=0',
-};
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function fetchDocument(url: string): Promise<Document> {
-  await sleep(1000);
-  const response = await fetch(url, { headers: BROWSER_HEADERS });
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  const html = await response.text();
-  return new JSDOM(html, { url, pretendToBeVisual: true }).window.document;
-}
 
 interface RawRow {
   title: string;
@@ -167,11 +144,10 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
   return groupIntoStudies(allRows);
 }
 
-async function computeContentHash(doc: Document): Promise<string> {
+function computeContentHash(doc: Document): Promise<string> {
   const detail = doc.querySelector('.hal-ea-studies-detail')?.innerHTML ?? '';
   const resources = doc.querySelector('.resource-listing-eastudies')?.innerHTML ?? '';
-  const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(detail + resources));
-  return Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return sha256Hex(detail + resources);
 }
 
 /**
@@ -244,3 +220,10 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
 
   return links;
 }
+
+export const haltonRegionAdapter: Adapter = {
+  municipalityOwner: MUNICIPALITY_OWNER,
+  inferStatus: false, // Halton's listing has a structured status column
+  fetchStudies: fetchHaltonRegionStudies,
+  fetchStudyDetail,
+};

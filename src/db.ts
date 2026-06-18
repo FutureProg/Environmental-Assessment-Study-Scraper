@@ -3,6 +3,7 @@ import type { AssessmentDiff, EngagementEvent, StudyDocument, EAStatus, EAStudy,
 
 export interface StoredAssessment {
   contentHash: string | null;
+  status: EAStatus;
   scope: ScopeResult;
   scopeReasoning: string | null;
 }
@@ -21,14 +22,14 @@ function getSql() {
 
 export async function getStoredAssessment(title: string, owner: string, sourceUrl: string): Promise<StoredAssessment | null> {
   const sql = getSql();
-  const [row] = await sql<{ content_hash: string | null; scope: ScopeResult; scope_reasoning: string | null }[]>`
-    SELECT a.content_hash, a.scope, a.scope_reasoning
+  const [row] = await sql<{ content_hash: string | null; status: EAStatus; scope: ScopeResult; scope_reasoning: string | null }[]>`
+    SELECT a.content_hash, a.status, a.scope, a.scope_reasoning
     FROM environmental_assessments.assessments a
     JOIN environmental_assessments.municipalities m ON m.id = a.municipality_owner
     WHERE a.title = ${title} AND m.name = ${owner} AND a.source_url = ${sourceUrl}
   `;
   if (!row) return null;
-  return { contentHash: row.content_hash, scope: row.scope, scopeReasoning: row.scope_reasoning };
+  return { contentHash: row.content_hash, status: row.status, scope: row.scope, scopeReasoning: row.scope_reasoning };
 }
 
 export async function upsertAssessment(

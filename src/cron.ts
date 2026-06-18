@@ -1,22 +1,50 @@
-import { fetchHaltonRegionStudies, fetchStudyDetail } from './adapters/halton-region.ts';
+import { adapters } from './adapters/index.ts';
 import { classifyStudy } from './classifier.ts';
 import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
 import { sendDiscordChanges } from './discord.ts';
+import type { Adapter, EAClassification } from './types.ts';
 
 export async function cronHandler() {
-  const studies = await fetchHaltonRegionStudies();
-  console.log(`Found ${studies.length} studies`);
+  for (const adapter of adapters) {
+    try {
+      await runAdapter(adapter);
+    } catch (err) {
+      console.error(`[${adapter.municipalityOwner}] adapter failed:`, err);
+    }
+  }
+
+  await closeDb();
+  console.log('Done');
+}
+
+async function runAdapter(adapter: Adapter) {
+  const studies = await adapter.fetchStudies();
+  console.log(`[${adapter.municipalityOwner}] Found ${studies.length} studies`);
 
   for (const study of studies) {
-    study.detail = await fetchStudyDetail(study.sourceUrl);
+    study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
 
     const stored = await getStoredAssessment(study.title, study.municipalityOwner, study.sourceUrl);
     const contentChanged = stored === null || stored.contentHash !== study.detail.contentHash;
 
-    const classification = contentChanged
-      ? await classifyStudy(study)
-      : { scope: stored!.scope, scopeReasoning: stored!.scopeReasoning ?? '' };
+    let classification: EAClassification;
+    if (contentChanged) {
+      classification = await classifyStudy(study, { inferStatus: adapter.inferStatus });
+      // For sources without a structured status field, adopt the inferred status.
+      if (adapter.inferStatus && classification.status) {
+        study.status = classification.status;
+        study.rawStatus = study.status;
+      }
+    } else {
+      classification = { scope: stored!.scope, scopeReasoning: stored!.scopeReasoning ?? '' };
+      // Content unchanged means status wasn't re-inferred — keep the stored status so
+      // we don't overwrite it with the adapter's placeholder 'unknown'.
+      if (adapter.inferStatus) {
+        study.status = stored!.status;
+        study.rawStatus = stored!.status;
+      }
+    }
 
     const diff = await upsertAssessment(study, classification, study.detail.contentHash);
 
@@ -50,7 +78,4 @@ export async function cronHandler() {
 
     await sendDiscordChanges(diff, newEvents, newDocuments);
   }
-
-  await closeDb();
-  console.log('Done');
 }
