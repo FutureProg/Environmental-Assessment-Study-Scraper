@@ -8,7 +8,7 @@ const COLORS = {
   purple: 0x9b59b6,
 };
 
-interface DiscordEmbed {
+export interface DiscordEmbed {
   title: string;
   description?: string;
   color: number;
@@ -16,21 +16,26 @@ interface DiscordEmbed {
   fields?: { name: string; value: string; inline?: boolean }[];
 }
 
-export async function sendDiscordChanges(
+/**
+ * Decides which Discord embeds (if any) should be posted for an assessment change,
+ * and whether the notification role should be mentioned. Pure — no network or env.
+ *
+ * Returns an empty `embeds` array when nothing should be sent.
+ */
+export function buildDiscordEmbeds(
   diff: AssessmentDiff,
   newEngagementEvents: EngagementEvent[],
   newDocuments: StudyDocument[],
-): Promise<void> {
-  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
-  if (!webhookUrl) return;
+): { embeds: DiscordEmbed[]; shouldMentionRole: boolean } {
+  const empty = { embeds: [] as DiscordEmbed[], shouldMentionRole: false };
 
   const isRelevant = diff.scope === 'in_scope' || diff.scopeChanged?.to === 'in_scope';
-  if (!isRelevant && !diff.isNew) return;
-  if (diff.isNew && diff.status === 'completed') return; // skip new studies that are already completed
-  if (diff.isNew && diff.status === 'deferred') return; // skip new studies that are already deferred
+  if (!isRelevant && !diff.isNew) return empty;
+  if (diff.isNew && diff.status === 'completed') return empty; // skip new studies that are already completed
+  if (diff.isNew && diff.status === 'deferred') return empty; // skip new studies that are already deferred
   const isNewlyCompleted = !diff.isNew && diff.statusChanged?.to === 'completed';
-  if (!isNewlyCompleted && diff.status === 'completed') return;
-  if (!diff.isNew && diff.statusChanged?.to !== 'deferred' && diff.status === 'deferred') return; // skip if study is deferred (but not just changed to deferred)
+  if (!isNewlyCompleted && diff.status === 'completed') return empty;
+  if (!diff.isNew && diff.statusChanged?.to !== 'deferred' && diff.status === 'deferred') return empty; // skip if study is deferred (but not just changed to deferred)
 
   const embeds: DiscordEmbed[] = [];
   let shouldMentionRole = false;
@@ -109,6 +114,18 @@ export async function sendDiscordChanges(
     }
   }
 
+  return { embeds, shouldMentionRole };
+}
+
+export async function sendDiscordChanges(
+  diff: AssessmentDiff,
+  newEngagementEvents: EngagementEvent[],
+  newDocuments: StudyDocument[],
+): Promise<void> {
+  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
+  if (!webhookUrl) return;
+
+  const { embeds, shouldMentionRole } = buildDiscordEmbeds(diff, newEngagementEvents, newDocuments);
   if (embeds.length === 0) return;
 
   const roleId = Deno.env.get('DISCORD_NOTIFICATION_ROLE_ID');

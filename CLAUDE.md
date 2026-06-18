@@ -6,7 +6,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 deno task dev        # run with file watching (uses varlock for env injection)
+deno task test       # run the test suite (deno test, offline — uses fixtures)
+deno check main.ts   # type-check the whole graph
+deno lint src/ main.ts
 ```
+
+## Development practices
+
+**Test-Driven Development is the default for this repo.** When adding or changing
+behaviour:
+
+1. **Write the test(s) first.** Capture the expected input/output as a failing test
+   before writing or modifying the implementation.
+2. **Implement to green.** Write the minimum code to make the test pass, then refactor.
+3. **Keep logic testable.** Separate pure logic (parsing, dedup, classification-decision,
+   notification-decision) from side effects (network, DB, Anthropic, Discord) so it can
+   be tested offline without mocks. Network adapters expose a pure `parse*` function that
+   operates on an HTML string, with a thin `fetch*` wrapper around it.
+4. **Tests are offline and deterministic.** Parsing tests run against committed HTML
+   fixtures in `tests/fixtures/<municipality>/`; never hit the live site in a test. Refresh
+   a fixture by re-downloading the page when a site's markup changes.
+5. **Test behaviour against the contract, not the implementation.** Assert on the
+   documented input→output behaviour, so a test failure means a real regression.
+
+Tests live in `tests/` as `*.test.ts` using `@std/assert`. Pure, exported seams currently
+under test include:
+- `parseOakvilleListing` / `parseOakvilleDetail` (`src/adapters/oakville.ts`)
+- `normaliseStatus`, `hasSuffixedUrl`, `groupIntoStudies` (`src/adapters/halton-region.ts`)
+- `buildDiscordEmbeds` (`src/discord.ts`)
 
 The `dev` task expands to: `varlock run -- deno run --watch -P --unstable-cron src/main.ts`
 

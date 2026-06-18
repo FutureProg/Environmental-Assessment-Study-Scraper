@@ -1,14 +1,15 @@
 {
   "tasks": {
     "dev": "varlock run -- deno run -P main.ts",
-    "dev:watch": "varlock run -- deno run --watch -P main.ts"
+    "dev:watch": "varlock run -- deno run --watch -P main.ts",
+    "test": "deno test --allow-read --allow-env"
   },
   "unstable": ["cron"],
   "nodeModulesDir": "auto",
   "permissions": {
     "default": {
       "read": true,
-      "net": {"allow": ["www.halton.ca:443", "api.anthropic.com:443", "discord.com:443", "db-postgresql-tor1-84212-do-user-2091629-0.f.db.ondigitalocean.com:25060"]},
+      "net": {"allow": ["www.halton.ca:443", "www.oakville.ca:443", "api.anthropic.com:443", "discord.com:443", "db-postgresql-tor1-84212-do-user-2091629-0.f.db.ondigitalocean.com:25060"]},
       "env": {"allow": ["JEST_WORKER_ID", "UNDICI_NO_WASM_SIMD", "ANTHROPIC_API_KEY",
         "ANTHROPIC_*", "DATABASE_URL", "DATABASE_CERT", "DISCORD_WEBHOOK_URL", "DENO_DEPLOYMENT_ID", "PG*"]}
     }

@@ -16,16 +16,26 @@ export const BROWSER_HEADERS = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Parses an HTML string into a DOM Document, optionally with a base URL. */
+export function parseHtml(html: string, url?: string): Document {
+  const options = url ? { url, pretendToBeVisual: true } : { pretendToBeVisual: true };
+  return new JSDOM(html, options).window.document;
+}
+
 /**
- * Fetches a URL with browser-like headers and parses the response into a DOM
- * Document. Sleeps 1s before each request to stay polite to municipal sites.
+ * Fetches a URL with browser-like headers and returns the response body.
+ * Sleeps 1s before each request to stay polite to municipal sites.
  */
-export async function fetchDocument(url: string): Promise<Document> {
+export async function fetchHtml(url: string): Promise<string> {
   await sleep(1000);
   const response = await fetch(url, { headers: BROWSER_HEADERS });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  const html = await response.text();
-  return new JSDOM(html, { url, pretendToBeVisual: true }).window.document;
+  return response.text();
+}
+
+/** Fetches a URL and parses the response into a DOM Document. */
+export async function fetchDocument(url: string): Promise<Document> {
+  return parseHtml(await fetchHtml(url), url);
 }
 
 /** SHA-256 hex digest of a string — used for detail-page content hashing. */

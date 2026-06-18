@@ -5,7 +5,7 @@ const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
 const MUNICIPALITY_OWNER = 'Halton Region';
 
-interface RawRow {
+export interface RawRow {
   title: string;
   municipalityArea: string;
   rawStatus: string;
@@ -17,7 +17,7 @@ function buildPageUrl(page: number): string {
   return `${BASE_URL}${LISTING_PATH}?searchtext=&searchmode=anyword&sort=8&page=${page}`;
 }
 
-function normaliseStatus(raw: string): EAStatus {
+export function normaliseStatus(raw: string): EAStatus {
   switch (raw.trim().toLowerCase()) {
     case 'on-going': return 'on_going';
     case 'deferred':  return 'deferred';
@@ -32,7 +32,7 @@ function normaliseStatus(raw: string): EAStatus {
  *
  * The un-suffixed URL is the canonical one that points to the primary study page.
  */
-function hasSuffixedUrl(url: string): boolean {
+export function hasSuffixedUrl(url: string): boolean {
   return /\-\(\d+\)$/.test(new URL(url).pathname);
 }
 
@@ -88,7 +88,7 @@ function parseRows(document: Document): RawRow[] {
  * The canonical `sourceUrl` is the URL without a numeric suffix. If none exists in the
  * group (shouldn't happen in practice), the first URL is used as a fallback.
  */
-function groupIntoStudies(rows: RawRow[]): EAStudy[] {
+export function groupIntoStudies(rows: RawRow[]): EAStudy[] {
   const grouped = new Map<string, RawRow[]>();
 
   for (const row of rows) {

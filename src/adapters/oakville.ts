@@ -1,5 +1,5 @@
 import type { Adapter, DocumentLink, EAStudy, EAStudyDetail } from '../types.ts';
-import { fetchDocument, sha256Hex } from './http.ts';
+import { fetchHtml, parseHtml, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.oakville.ca';
 const LISTING_PATH = '/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/';
@@ -50,14 +50,20 @@ function parseStudies(document: Document): EAStudy[] {
 }
 
 /**
+ * Parses Oakville's listing page HTML into studies. Pure — no network.
+ */
+export function parseOakvilleListing(html: string): EAStudy[] {
+  return parseStudies(parseHtml(html));
+}
+
+/**
  * Fetches all EA studies from Oakville's listing page.
  *
  * Unlike Halton, the listing is a single un-paginated page, so there is no pagination
  * or cross-municipality deduplication to handle.
  */
 export async function fetchOakvilleStudies(): Promise<EAStudy[]> {
-  const doc = await fetchDocument(`${BASE_URL}${LISTING_PATH}`);
-  return parseStudies(doc);
+  return parseOakvilleListing(await fetchHtml(`${BASE_URL}${LISTING_PATH}`));
 }
 
 /**
@@ -85,7 +91,9 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
 }
 
 /**
- * Fetches an Oakville study's detail page and extracts:
+ * Parses an Oakville study detail page HTML into an `EAStudyDetail`. Pure — no network.
+ *
+ * Extracts:
  * - `description`: plain text from `.widget-text` blocks (truncated, used for classification)
  * - `engagementHtml`: inner HTML of those same blocks with relative links resolved (used for engagement extraction)
  * - `documentLinks`: structured rows from `.widget-link-listing` (title, URL; no date label)
@@ -93,8 +101,8 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
  *
  * Falls back to main/body text for `description` when no `.widget-text` block is present.
  */
-export async function fetchOakvilleStudyDetail(sourceUrl: string): Promise<EAStudyDetail> {
-  const doc = await fetchDocument(sourceUrl);
+export async function parseOakvilleDetail(html: string): Promise<EAStudyDetail> {
+  const doc = parseHtml(html);
 
   const textBlocks = Array.from(doc.querySelectorAll('.widget-text'));
 
@@ -123,6 +131,11 @@ export async function fetchOakvilleStudyDetail(sourceUrl: string): Promise<EAStu
   const contentHash = await sha256Hex(textHtml + linkHtml);
 
   return { description, engagementHtml, documentLinks, contentHash };
+}
+
+/** Fetches and parses an Oakville study's detail page. */
+export async function fetchOakvilleStudyDetail(sourceUrl: string): Promise<EAStudyDetail> {
+  return parseOakvilleDetail(await fetchHtml(sourceUrl));
 }
 
 export const oakvilleAdapter: Adapter = {
