@@ -186,5 +186,6 @@ function fmtWithDefault(s: string, defaultHour: number, defaultMin: number): str
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start && !end) return 'Date TBD';
   if (!end) return fmtSingle(start!);
-  return `${fmtWithDefault(start!, 0, 0)} – ${fmtWithDefault(end, 23, 59)}`;
+  if (!start) return fmtSingle(end);  // end-only period (e.g. comment deadline with no start)
+  return `${fmtWithDefault(start, 0, 0)} – ${fmtWithDefault(end, 23, 59)}`;
 }
