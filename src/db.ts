@@ -20,13 +20,13 @@ function getSql() {
   return _sql;
 }
 
-export async function getStoredAssessment(title: string, owner: string, sourceUrl: string): Promise<StoredAssessment | null> {
+export async function getStoredAssessment(title: string, owner: string): Promise<StoredAssessment | null> {
   const sql = getSql();
   const [row] = await sql<{ content_hash: string | null; status: EAStatus; scope: ScopeResult; scope_reasoning: string | null }[]>`
     SELECT a.content_hash, a.status, a.scope, a.scope_reasoning
     FROM environmental_assessments.assessments a
     JOIN environmental_assessments.municipalities m ON m.id = a.municipality_owner
-    WHERE a.title = ${title} AND m.name = ${owner} AND a.source_url = ${sourceUrl}
+    WHERE a.title = ${title} AND m.name = ${owner}
   `;
   if (!row) return null;
   return { contentHash: row.content_hash, status: row.status, scope: row.scope, scopeReasoning: row.scope_reasoning };
@@ -39,12 +39,14 @@ export async function upsertAssessment(
 ): Promise<AssessmentDiff> {
   const sql = getSql();
 
-  // Capture existing state before upsert for change detection
+  // Capture existing state before upsert for change detection. Matched on the
+  // (title, municipality_owner) unique key — the same conflict target the upsert
+  // uses — so existing state is found even when a study's source_url changes.
   const [existing] = await sql<{ id: number; status: string; scope: string }[]>`
     SELECT a.id, a.status, a.scope
     FROM environmental_assessments.assessments a
     JOIN environmental_assessments.municipalities m ON m.id = a.municipality_owner
-    WHERE a.title = ${study.title} AND m.name = ${study.municipalityOwner} AND a.source_url = ${study.sourceUrl}
+    WHERE a.title = ${study.title} AND m.name = ${study.municipalityOwner}
   `;
 
   const [row] = await sql<{ id: number; is_new: boolean }[]>`

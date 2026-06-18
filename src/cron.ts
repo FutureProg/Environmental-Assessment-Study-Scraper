@@ -25,16 +25,17 @@ async function runAdapter(adapter: Adapter) {
   for (const study of studies) {
     study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
 
-    const stored = await getStoredAssessment(study.title, study.municipalityOwner, study.sourceUrl);
+    const stored = await getStoredAssessment(study.title, study.municipalityOwner);
     const contentChanged = stored === null || stored.contentHash !== study.detail.contentHash;
 
     let classification: EAClassification;
     if (contentChanged) {
       classification = await classifyStudy(study, { inferStatus: adapter.inferStatus });
       // For sources without a structured status field, adopt the inferred status.
+      // rawStatus is left as the adapter set it (empty) — it records the verbatim
+      // scraped status, and inferred status was never scraped from the source.
       if (adapter.inferStatus && classification.status) {
         study.status = classification.status;
-        study.rawStatus = study.status;
       }
     } else {
       classification = { scope: stored!.scope, scopeReasoning: stored!.scopeReasoning ?? '' };
@@ -42,7 +43,6 @@ async function runAdapter(adapter: Adapter) {
       // we don't overwrite it with the adapter's placeholder 'unknown'.
       if (adapter.inferStatus) {
         study.status = stored!.status;
-        study.rawStatus = stored!.status;
       }
     }
 

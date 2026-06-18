@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-deno task dev        # run with file watching (uses varlock for env injection)
+deno task dev        # run once (uses varlock for env injection)
+deno task dev:watch  # run with file watching
 deno task test       # run the test suite (deno test, offline — uses fixtures)
 deno check main.ts   # type-check the whole graph
 deno lint src/ main.ts
@@ -36,15 +37,15 @@ exported seams currently under test include:
 - `normaliseStatus`, `hasSuffixedUrl`, `groupIntoStudies` (`src/adapters/halton-region.ts`)
 - `buildDiscordEmbeds` (`src/discord.ts`)
 
-The `dev` task expands to: `varlock run -- deno run --watch -P --unstable-cron src/main.ts`
+The `dev` task expands to: `varlock run -- deno run -P main.ts` (`dev:watch` adds `--watch`)
 
-- `--unstable-cron` is required for `Deno.cron()`
+- `Deno.cron()` requires the unstable `cron` flag, enabled via `"unstable": ["cron"]` in `deno.json`
 - `-P` applies the permission set defined in `deno.json` (`permissions.default`)
 - Environment variables must be set via varlock (see `.env.schema`) — `DATABASE_URL`, `DATABASE_CERT`, `ANTHROPIC_API_KEY`, `DISCORD_WEBHOOK_URL`
 
 ## Architecture
 
-The scraper runs as a single Deno script (`src/main.ts`) that immediately executes on startup and also registers a `Deno.cron` trigger for scheduled runs on Deno Deploy.
+The scraper runs as a single Deno script (`main.ts`) that immediately executes on startup and also registers a `Deno.cron` trigger for scheduled runs on Deno Deploy.
 
 **Data flow (per municipality, see `src/cron.ts`):**
 1. `adapter.fetchStudies()` — returns the municipality's `EAStudy[]`
