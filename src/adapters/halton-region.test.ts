@@ -4,7 +4,7 @@ import {
   hasSuffixedUrl,
   normaliseStatus,
   type RawRow,
-} from '../src/adapters/halton-region.ts';
+} from './halton-region.ts';
 
 // ---------- normaliseStatus ----------
 

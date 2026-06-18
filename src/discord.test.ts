@@ -1,10 +1,10 @@
 import { assert, assertEquals } from '@std/assert';
-import { buildDiscordEmbeds } from '../src/discord.ts';
+import { buildDiscordEmbeds } from './discord.ts';
 import type {
   AssessmentDiff,
   EngagementEvent,
   StudyDocument,
-} from '../src/types.ts';
+} from './types.ts';
 
 const PAST = '2000-01-01';
 const FUTURE = '2999-01-01';

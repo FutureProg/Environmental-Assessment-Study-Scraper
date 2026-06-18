@@ -2,7 +2,7 @@ import { assert, assertEquals, assertMatch } from '@std/assert';
 import {
   parseOakvilleListing,
   parseOakvilleDetail,
-} from '../src/adapters/oakville.ts';
+} from './oakville.ts';
 
 const decoder = new TextDecoder('utf-8');
 
