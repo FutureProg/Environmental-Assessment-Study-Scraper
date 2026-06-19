@@ -16,9 +16,9 @@ export interface DocumentLink {
 
 export interface EAStudyDetail {
   description: string;           // plain text, truncated to 3000 chars — used by classifyStudy()
-  engagementHtml: string;        // raw inner HTML of .ck-text sections — used by extractEngagementEvents()
-  documentLinks: DocumentLink[]; // structured rows from hal-ea-studies-listing — used by extractEngagementEvents()
-  contentHash: string;           // SHA-256 of .hal-ea-studies-detail + .resource-listing-eastudies innerHTML
+  engagementHtml: string;        // raw inner HTML of the detail-page content sections (selectors are adapter-specific) — used by extractEngagementEvents()
+  documentLinks: DocumentLink[]; // structured document rows scraped from the detail page (selectors are adapter-specific) — used by extractEngagementEvents()
+  contentHash: string;           // SHA-256 of the detail-page content used for change detection; exact selectors are adapter-specific
 }
 
 export interface EAStudy {

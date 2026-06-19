@@ -97,6 +97,17 @@ Deno.test('parseOakvilleListing: leaves http(s) hrefs unchanged; skips empty hre
   assertEquals(studies.length, 2);
 });
 
+Deno.test('parseOakvilleListing: resolves protocol-relative hrefs to https', () => {
+  const html = `
+    <div class="widget-page-cards">
+      <a class="card" href="//cdn.oakville.ca/study/">
+        <div class="card-title">Protocol Relative Study</div>
+      </a>
+    </div>`;
+  const studies = parseOakvilleListing(html);
+  assertEquals(studies[0].sourceUrl, 'https://cdn.oakville.ca/study/');
+});
+
 Deno.test('parseOakvilleListing: collapses internal whitespace in title', () => {
   const html = `
     <div class="widget-page-cards">
@@ -154,6 +165,14 @@ Deno.test('parseOakvilleDetail (burnhamthorpe): engagementHtml absolutises relat
       'href="/business-development/planning-development/official-plan/north-oakville-secondary-plans/"',
     ),
   );
+});
+
+Deno.test('parseOakvilleDetail: falls back to main/body text when no .widget-text', async () => {
+  const html = `<html><body><main>Fallback content</main></body></html>`;
+  const detail = await parseOakvilleDetail(html);
+  assert(detail.description.includes('Fallback content'));
+  assertEquals(detail.documentLinks.length, 0);
+  assertMatch(detail.contentHash, /^[0-9a-f]{64}$/);
 });
 
 Deno.test('parseOakvilleDetail (coronation-park): 7 document links, nested ul', async () => {

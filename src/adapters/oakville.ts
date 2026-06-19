@@ -7,7 +7,9 @@ const MUNICIPALITY_OWNER = 'Town of Oakville';
 
 /** Resolves a possibly-relative href against Oakville's base URL. */
 function absoluteUrl(href: string): string {
-  return href.startsWith('http') ? href : `${BASE_URL}${href}`;
+  if (href.startsWith('http://') || href.startsWith('https://')) return href;
+  if (href.startsWith('//')) return `https:${href}`;  // protocol-relative
+  return `${BASE_URL}${href}`;
 }
 
 /**
