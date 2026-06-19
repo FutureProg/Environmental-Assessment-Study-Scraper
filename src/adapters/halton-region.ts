@@ -1,5 +1,5 @@
 import type { Adapter, DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
-import { fetchDocument, sha256Hex } from './http.ts';
+import { absoluteUrl, fetchDocument, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
@@ -58,7 +58,7 @@ function parseRows(document: Document): RawRow[] {
     const anchor = cells[0].querySelector('a');
     const title = anchor?.textContent?.trim() ?? cells[0].textContent?.trim() ?? '';
     const href = anchor?.getAttribute('href') ?? '';
-    const sourceUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+    const sourceUrl = absoluteUrl(href, BASE_URL);
     const municipalityArea = cells[1].textContent?.trim() ?? '';
     const rawStatus = cells[2].textContent?.trim() ?? '';
 
@@ -210,7 +210,7 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
 
     const title = anchor.textContent?.trim() ?? '';
     const href = anchor.getAttribute('href') ?? '';
-    const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+    const url = absoluteUrl(href, BASE_URL);
     const dateEl = row.querySelector('.hal-ea-studies-listing-item-report-date');
     const date = dateEl?.textContent?.trim() ?? null;
 

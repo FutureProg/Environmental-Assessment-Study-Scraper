@@ -38,6 +38,16 @@ export async function fetchDocument(url: string): Promise<Document> {
   return parseHtml(await fetchHtml(url), url);
 }
 
+/**
+ * Resolves a possibly-relative href to an absolute URL against a base URL.
+ * Handles https/http, protocol-relative `//`, and site-relative `/` paths.
+ */
+export function absoluteUrl(href: string, baseUrl: string): string {
+  if (href.startsWith('http://') || href.startsWith('https://')) return href;
+  if (href.startsWith('//')) return `https:${href}`;
+  return `${baseUrl}${href}`;
+}
+
 /** SHA-256 hex digest of a string — used for detail-page content hashing. */
 export async function sha256Hex(input: string): Promise<string> {
   const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));

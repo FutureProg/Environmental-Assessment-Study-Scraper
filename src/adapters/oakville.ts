@@ -1,16 +1,9 @@
 import type { Adapter, DocumentLink, EAStudy, EAStudyDetail } from '../types.ts';
-import { fetchHtml, parseHtml, sha256Hex } from './http.ts';
+import { absoluteUrl, fetchHtml, parseHtml, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.oakville.ca';
 const LISTING_PATH = '/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/';
 const MUNICIPALITY_OWNER = 'Town of Oakville';
-
-/** Resolves a possibly-relative href against Oakville's base URL. */
-function absoluteUrl(href: string): string {
-  if (href.startsWith('http://') || href.startsWith('https://')) return href;
-  if (href.startsWith('//')) return `https:${href}`;  // protocol-relative
-  return `${BASE_URL}${href}`;
-}
 
 /**
  * Parses Oakville's EA listing into studies.
@@ -31,7 +24,7 @@ function parseStudies(document: Document): EAStudy[] {
     const href = card.getAttribute('href') ?? '';
     if (!href) continue;
 
-    const sourceUrl = absoluteUrl(href);
+    const sourceUrl = absoluteUrl(href, BASE_URL);
     if (seen.has(sourceUrl)) continue;
 
     const title = card.querySelector('.card-title')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
@@ -83,7 +76,7 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
     const href = anchor.getAttribute('href') ?? '';
     if (!title || !href) continue;
 
-    const url = absoluteUrl(href);
+    const url = absoluteUrl(href, BASE_URL);
     if (seen.has(url)) continue;
     seen.add(url);
     links.push({ title, url, date: null });
