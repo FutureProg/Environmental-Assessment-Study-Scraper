@@ -178,6 +178,7 @@ export async function fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail
         .map((el) => el.innerHTML.trim())
         .filter(Boolean)
         .join('\n\n')
+        .replace(/href="(\/\/[^"]+)"/g, `href="https:$1"`)
         .replace(/href="(\/[^"]+)"/g, `href="${BASE_URL}$1"`);
     }
   }
