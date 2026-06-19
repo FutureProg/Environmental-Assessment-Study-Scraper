@@ -65,9 +65,13 @@ flowchart TD
 
 Burlington publishes EA studies as paginated news posts rather than a structured table. Approach to be determined.
 
-### Town of Oakville *(TBD)*
+### Town of Oakville
 
-Oakville's listing page contains titles and brief descriptions only — no status field. Approach to be determined, likely requiring individual page visits to extract status.
+- **Listing page:** Single, un-paginated page at `/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/`
+- **Parsed fields:** Project name and link to the individual study page. Oakville covers a single municipality, so `municipality_areas` is always `{Oakville}`
+- **CSS selector:** Studies are rendered as cards under `.widget-page-cards a.card`; each card has a `.card-title` (study name) and `.card-text` (short description)
+- **No status field:** Unlike Halton Region, Oakville's listing has no status column and the individual pages have no structured status either. Status is **inferred by Claude** during classification from the detail-page text and document titles (e.g. a "Notice of Study Completion" document implies the study is `completed`). The classifier is invoked with an `inferStatus` flag that adds a `status` field to its structured output; for sources like Halton that publish an authoritative status, this flag is left off.
+- **Individual study pages:** Description is taken from `.widget-text` blocks; published reports/notices are collected from the `.widget-link-listing` ("Project documents") lists. These pages have no consistent publication-date labels, so document `published_label` is left null.
 
 ### Town of Milton *(TBD)*
 

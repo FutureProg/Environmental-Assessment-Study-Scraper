@@ -1,34 +1,11 @@
-import { JSDOM } from 'jsdom';
-import type { DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
+import type { Adapter, DocumentLink, EAStatus, EAStudy, EAStudyDetail } from '../types.ts';
+import { absoluteUrl, fetchDocument, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.halton.ca';
 const LISTING_PATH = '/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies';
 const MUNICIPALITY_OWNER = 'Halton Region';
-const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-const BROWSER_HEADERS = {
-  'User-Agent': USER_AGENT,
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-CA,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Upgrade-Insecure-Requests': '1',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Cache-Control': 'max-age=0',
-};
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function fetchDocument(url: string): Promise<Document> {
-  await sleep(1000);
-  const response = await fetch(url, { headers: BROWSER_HEADERS });
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  const html = await response.text();
-  return new JSDOM(html, { url, pretendToBeVisual: true }).window.document;
-}
-
-interface RawRow {
+export interface RawRow {
   title: string;
   municipalityArea: string;
   rawStatus: string;
@@ -40,7 +17,7 @@ function buildPageUrl(page: number): string {
   return `${BASE_URL}${LISTING_PATH}?searchtext=&searchmode=anyword&sort=8&page=${page}`;
 }
 
-function normaliseStatus(raw: string): EAStatus {
+export function normaliseStatus(raw: string): EAStatus {
   switch (raw.trim().toLowerCase()) {
     case 'on-going': return 'on_going';
     case 'deferred':  return 'deferred';
@@ -55,7 +32,7 @@ function normaliseStatus(raw: string): EAStatus {
  *
  * The un-suffixed URL is the canonical one that points to the primary study page.
  */
-function hasSuffixedUrl(url: string): boolean {
+export function hasSuffixedUrl(url: string): boolean {
   return /\-\(\d+\)$/.test(new URL(url).pathname);
 }
 
@@ -81,7 +58,7 @@ function parseRows(document: Document): RawRow[] {
     const anchor = cells[0].querySelector('a');
     const title = anchor?.textContent?.trim() ?? cells[0].textContent?.trim() ?? '';
     const href = anchor?.getAttribute('href') ?? '';
-    const sourceUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+    const sourceUrl = absoluteUrl(href, BASE_URL);
     const municipalityArea = cells[1].textContent?.trim() ?? '';
     const rawStatus = cells[2].textContent?.trim() ?? '';
 
@@ -111,7 +88,7 @@ function parseRows(document: Document): RawRow[] {
  * The canonical `sourceUrl` is the URL without a numeric suffix. If none exists in the
  * group (shouldn't happen in practice), the first URL is used as a fallback.
  */
-function groupIntoStudies(rows: RawRow[]): EAStudy[] {
+export function groupIntoStudies(rows: RawRow[]): EAStudy[] {
   const grouped = new Map<string, RawRow[]>();
 
   for (const row of rows) {
@@ -167,11 +144,10 @@ export async function fetchHaltonRegionStudies(): Promise<EAStudy[]> {
   return groupIntoStudies(allRows);
 }
 
-async function computeContentHash(doc: Document): Promise<string> {
+function computeContentHash(doc: Document): Promise<string> {
   const detail = doc.querySelector('.hal-ea-studies-detail')?.innerHTML ?? '';
   const resources = doc.querySelector('.resource-listing-eastudies')?.innerHTML ?? '';
-  const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(detail + resources));
-  return Array.from(new Uint8Array(buffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return sha256Hex(detail + resources);
 }
 
 /**
@@ -202,6 +178,7 @@ export async function fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail
         .map((el) => el.innerHTML.trim())
         .filter(Boolean)
         .join('\n\n')
+        .replace(/href="(\/\/[^"]+)"/g, `href="https:$1"`)
         .replace(/href="(\/[^"]+)"/g, `href="${BASE_URL}$1"`);
     }
   }
@@ -233,7 +210,7 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
 
     const title = anchor.textContent?.trim() ?? '';
     const href = anchor.getAttribute('href') ?? '';
-    const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+    const url = absoluteUrl(href, BASE_URL);
     const dateEl = row.querySelector('.hal-ea-studies-listing-item-report-date');
     const date = dateEl?.textContent?.trim() ?? null;
 
@@ -244,3 +221,10 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
 
   return links;
 }
+
+export const haltonRegionAdapter: Adapter = {
+  municipalityOwner: MUNICIPALITY_OWNER,
+  inferStatus: false, // Halton's listing has a structured status column
+  fetchStudies: fetchHaltonRegionStudies,
+  fetchStudyDetail,
+};

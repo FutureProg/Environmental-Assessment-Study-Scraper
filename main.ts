@@ -2,7 +2,7 @@ import { cronHandler } from './src/cron.ts';
 import { serverHandler } from './src/server.ts';
 
 // Execute at 10PM UTC (6PM EDT) every day
-Deno.cron("Halton Region Environmental Assessments", '0 22 * * *', async () => {
+Deno.cron("Municipal Environmental Assessments", '0 22 * * *', async () => {
   await cronHandler();
 });
 
