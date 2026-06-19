@@ -135,11 +135,14 @@ export async function sendDiscordChanges(
   for (let i = 0; i < embeds.length; i += 10) {
     const payload: Record<string, unknown> = { embeds: embeds.slice(i, i + 10) };
     if (i === 0 && mention) payload.content = mention;
-    await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      console.error(`Discord webhook failed: ${res.status} ${await res.text()}`);
+    }
   }
 }
 
