@@ -1,6 +1,7 @@
 import type { Adapter } from '../types.ts';
 import { haltonRegionAdapter } from './halton-region.ts';
 import { oakvilleAdapter } from './oakville.ts';
+import { burlingtonAdapter } from './burlington.ts';
 
 /**
  * All active municipality adapters, scraped in order on each cron run.
@@ -9,4 +10,5 @@ import { oakvilleAdapter } from './oakville.ts';
 export const adapters: Adapter[] = [
   haltonRegionAdapter,
   oakvilleAdapter,
+  burlingtonAdapter,
 ];

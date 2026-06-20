@@ -15,7 +15,7 @@ Each municipality exposes EA information differently, which means the scraper re
 | Municipality | EA Listing Page | Structure | Status Field | Notes |
 |---|---|---|---|---|
 | **Halton Region** | [EA Studies](https://www.halton.ca/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies) | Searchable table (Project, Municipality, Status) | Structured: `On-going`, `Deferred`, `Completed` | 5 pages of results; individual study pages linked |
-| **City of Burlington** | [EA Projects](https://www.burlington.ca/Modules/News/en/Environmental) | News/blog post format, paginated | Free-form text within post body | No structured status field; dates embedded in post text |
+| **City of Burlington** | [Get Involved Burlington](https://www.getinvolvedburlington.ca/projects) | EngagementHQ project tiles (single page) | No EA status (project `published`/`archived` state only) | City's own `/Modules/News/` EA index is WAF-blocked; the engagement platform is where active consultations are posted |
 | **Town of Oakville** | [EA Studies](https://www.oakville.ca/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/) | Simple list with title and 1–2 sentence description | No status on listing page | Must follow individual study links to determine status |
 | **Town of Milton** | [Town Projects](https://www.milton.ca/en/business-and-development/town-projects.aspx) | No central EA listing; projects spread across individual pages | Embedded in project page text | Individual pages are rich (full timelines, public open house dates/locations, comment deadlines) |
 | **Town of Halton Hills** | [EA Studies](https://www.haltonhills.ca/en/residents/environmental-assessment-ea-studies.aspx) | Structured listing with study details | Free-form text (e.g. "Study initiated April 2015, on-going") | Includes consultant names, contact info, and PIC dates |
@@ -61,9 +61,36 @@ flowchart TD
 - **CSS selector:** Results are in `.hal-generic-smart-search-results-table tbody tr`; each row contains three `<td>` elements in order: project name (with anchor), municipality, status
 - **Individual study pages:** Linked from the project name column; contain additional detail including study description and engagement information (see [Engagement Data Extraction](#engagement-data-extraction-planned))
 
-### City of Burlington *(TBD)*
+### City of Burlington
 
-Burlington publishes EA studies as paginated news posts rather than a structured table. Approach to be determined.
+Burlington does not publish a structured EA listing. The city's EA news index
+(`burlington.ca/Modules/News/en/Environmental`, linked from the README's original table) is
+served behind an Azure WAF rule that returns **403 on any `/Modules/` path** — individual
+`.aspx` news pages load fine, but the module-rendered listing (and its RSS feed) cannot be
+fetched, and the path rule applies to every client, so it would fail from Deno Deploy too.
+The site's `sitemap.xml` does not enumerate the individual EA news posts either.
+
+Instead, the adapter targets **Get Involved Burlington** (`getinvolvedburlington.ca`), the
+city's Granicus **EngagementHQ** platform. This is where active EA public consultations and
+their comment windows are posted — exactly the engagement data this project cares about.
+
+- **Listing page:** Single, server-rendered page at `/projects`. Every project is a
+  `.project-tile` with a `data-state` (`published` / `archived`), an `a.project-tile__link`
+  to the project page, and a `.project-tile__meta__name` title.
+- **Not EA-specific:** Unlike the other municipalities' listings, this platform carries
+  *every* kind of engagement (budgets, festivals, surveys, …), not just EAs. The scope
+  classifier filters out non-EA / out-of-scope projects the same way it does elsewhere —
+  out-of-scope projects are stored but never trigger a notification. (Trade-off: EAs that
+  only ever appear as a news notice, with no engagement project, are not covered.)
+- **Title decoding:** Listing titles are double HTML-encoded in the source markup
+  (`Festivals &amp;amp; Events Strategy`), so the adapter decodes entities a second time.
+- **No status field:** There is no EA status, so `inferStatus: true` — Claude infers status
+  during classification from the detail-page content. The project's `published`/`archived`
+  state is recorded verbatim in `rawStatus`.
+- **Individual project pages:** Description is taken from `.shared-content-block` content
+  sections; documents are collected from the document-library widget
+  (`a.document-library-widget-link`). These links carry no publication-date label, so
+  document `date` is left null.
 
 ### Town of Oakville
 
@@ -100,7 +127,7 @@ Where available, each EA study's individual page is scraped for:
 - **Public consultation dates and times** — open houses, comment deadlines, or hearing dates
 - **Engagement links** — registration pages, online comment forms, or document downloads
 
-This information is unstructured and inconsistently formatted across municipalities. For example, Milton's individual study pages include full public open house schedules (date, time, location, comment deadline) and links to platforms like "Let's Talk Milton", while Halton Hills pages list PIC dates and consultant contacts. Burlington embeds timeline information in news post body text with no consistent structure.
+This information is unstructured and inconsistently formatted across municipalities. For example, Milton's individual study pages include full public open house schedules (date, time, location, comment deadline) and links to platforms like "Let's Talk Milton", while Halton Hills pages list PIC dates and consultant contacts. Burlington embeds timeline information in its Get Involved project lifecycle stages and content blocks with no consistent structure.
 
 Because no two municipalities format this data the same way, extraction is handled by Claude Haiku using a forced tool call to produce structured output — the same pattern used for scope classification.
 
