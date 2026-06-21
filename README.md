@@ -15,7 +15,7 @@ Each municipality exposes EA information differently, which means the scraper re
 | Municipality | EA Listing Page | Structure | Status Field | Notes |
 |---|---|---|---|---|
 | **Halton Region** | [EA Studies](https://www.halton.ca/for-residents/infrastructure-and-growth/municipal-class-environmental-assessment-studies) | Searchable table (Project, Municipality, Status) | Structured: `On-going`, `Deferred`, `Completed` | 5 pages of results; individual study pages linked |
-| **City of Burlington** | [Get Involved Burlington](https://www.getinvolvedburlington.ca/projects) | EngagementHQ project tiles (single page) | No EA status (project `published`/`archived` state only) | City's own `/Modules/News/` EA index is WAF-blocked; the engagement platform is where active consultations are posted |
+| **City of Burlington** | [Get Involved Burlington](https://www.getinvolvedburlington.ca/projects) + [news feed](https://www.burlington.ca/Modules/NewsModule/services/getTopFiveNews.ashx?limit=500&lang=en) (JSON) | EngagementHQ project tiles + NewsModule JSON feed | No EA status (inferred) | City's own `/Modules/News/` EA index is WAF-blocked; two complementary sources used instead (see below) |
 | **Town of Oakville** | [EA Studies](https://www.oakville.ca/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/) | Simple list with title and 1–2 sentence description | No status on listing page | Must follow individual study links to determine status |
 | **Town of Milton** | [Town Projects](https://www.milton.ca/en/business-and-development/town-projects.aspx) | No central EA listing; projects spread across individual pages | Embedded in project page text | Individual pages are rich (full timelines, public open house dates/locations, comment deadlines) |
 | **Town of Halton Hills** | [EA Studies](https://www.haltonhills.ca/en/residents/environmental-assessment-ea-studies.aspx) | Structured listing with study details | Free-form text (e.g. "Study initiated April 2015, on-going") | Includes consultant names, contact info, and PIC dates |
@@ -70,9 +70,21 @@ served behind an Azure WAF rule that returns **403 on any `/Modules/` path** —
 fetched, and the path rule applies to every client, so it would fail from Deno Deploy too.
 The site's `sitemap.xml` does not enumerate the individual EA news posts either.
 
-Instead, the adapter targets **Get Involved Burlington** (`getinvolvedburlington.ca`), the
-city's Granicus **EngagementHQ** platform. This is where active EA public consultations and
-their comment windows are posted — exactly the engagement data this project cares about.
+Two complementary, accessible sources are used instead, each with its own adapter
+(both report `municipalityOwner: 'City of Burlington'`):
+
+1. **Get Involved Burlington** (`getinvolvedburlington.ca`) — active public consultations.
+2. **City news feed** (`getTopFiveNews.ashx`) — EA / capital-project notices.
+
+These overlap deliberately: news notices often link to a Get Involved project, but each
+also carries studies the other misses (creek/flood EAs rarely get an engagement project;
+many engagement projects never appear as a news notice). Cross-source de-duplication is not
+attempted — a study appearing in both is stored once per source.
+
+#### Source 1 — Get Involved Burlington (`src/adapters/burlington.ts`)
+
+The city's Granicus **EngagementHQ** platform, where active EA public consultations and
+their comment windows are posted.
 
 - **Listing page:** Single, server-rendered page at `/projects`. Every project is a
   `.project-tile` with a `data-state` (`published` / `archived`), an `a.project-tile__link`
@@ -91,6 +103,25 @@ their comment windows are posted — exactly the engagement data this project ca
   sections; documents are collected from the document-library widget
   (`a.document-library-widget-link`). These links carry no publication-date label, so
   document `date` is left null.
+
+#### Source 2 — City news feed (`src/adapters/burlington-news.ts`)
+
+The News *module* listing is WAF-blocked, but the JSON service that powers the site's
+on-page news feeds (`/Modules/NewsModule/services/getTopFiveNews.ashx`) is **not**, and the
+individual `.aspx` news pages load fine. This adapter uses both.
+
+- **Listing:** `getTopFiveNews.ashx?limit=500&lang=en` returns recent news across all
+  categories as JSON. Items are filtered to the
+  `/en/news/current-city-projects-and-construction/` path — Burlington's "Current City
+  Projects and Construction" category, which holds Municipal Class EAs (road, bridge,
+  creek/flood, erosion) alongside capital works. This captures the creek/flood Class EAs
+  (e.g. *Lower Rambo Creek Flood Mitigation EA*, *Tuck Creek Flood Study Class EA*) that
+  never get a Get Involved project. It is a *rolling recent* feed, so new notices are caught
+  as they post rather than backfilling the full archive.
+- **No status field:** `inferStatus: true` — the classifier infers status from the page.
+- **Individual news pages:** Description is taken from the page's `.ge-content` body blocks
+  (within `#mainContent`); published documents are collected from `/en/news/resources/`
+  links. No per-document date label, so document `date` is left null.
 
 ### Town of Oakville
 
