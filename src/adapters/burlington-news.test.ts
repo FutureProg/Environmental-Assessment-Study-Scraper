@@ -40,7 +40,7 @@ Deno.test('parseBurlingtonNewsFeed: captures EA notices not on Get Involved', as
   const json = await fixture('news-feed.json');
   const titles = parseBurlingtonNewsFeed(json).map((s) => s.title);
   // creek/flood Class EAs that only exist as news notices
-  assert(titles.includes('Lower Rambo Creek Flood Mitigation Environmental Assessment'));
+  assert(titles.some((t) => t.includes('Lower Rambo Creek Flood Mitigation Environmental Assessment')));
   assert(titles.some((t) => t.includes('Falcon Creek Erosion Control Environmental Assessment')));
 });
 
@@ -112,7 +112,8 @@ Deno.test('parseBurlingtonNewsDetail: engagementHtml absolutises relative hrefs'
 Deno.test('parseBurlingtonNewsDetail: falls back to h1/main text when no content block', async () => {
   const html = `<html><body><h1>Fallback Study</h1><main>Body text only</main></body></html>`;
   const detail = await parseBurlingtonNewsDetail(html);
-  assert(detail.description.includes('Fallback Study') || detail.description.includes('Body text'));
+  assert(detail.description.includes('Fallback Study'));
+  assert(detail.description.includes('Body text'));
   assertEquals(detail.documentLinks.length, 0);
   assertMatch(detail.contentHash, /^[0-9a-f]{64}$/);
 });

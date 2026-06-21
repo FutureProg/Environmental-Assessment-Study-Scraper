@@ -39,6 +39,23 @@ export async function fetchDocument(url: string): Promise<Document> {
 }
 
 /**
+ * Fetches a URL and returns the response body as text, without browser-specific HTML headers.
+ * Use for JSON API endpoints where sending `Accept: text/html` would be semantically wrong.
+ */
+export async function fetchJson(url: string): Promise<string> {
+  await sleep(1000);
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      'Accept': 'application/json,*/*;q=0.8',
+      'Accept-Language': 'en-CA,en;q=0.9',
+    },
+  });
+  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  return response.text();
+}
+
+/**
  * Resolves a possibly-relative href to an absolute URL against a base URL.
  * Handles https/http, protocol-relative `//`, and site-relative `/` paths.
  */

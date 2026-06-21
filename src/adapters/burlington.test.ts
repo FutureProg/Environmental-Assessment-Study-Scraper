@@ -163,7 +163,8 @@ Deno.test('parseBurlingtonDetail: engagementHtml absolutises relative hrefs', as
 Deno.test('parseBurlingtonDetail: falls back to h1/main text when no content block', async () => {
   const html = `<html><body><h1>Fallback Project</h1><main>Some body content here</main></body></html>`;
   const detail = await parseBurlingtonDetail(html);
-  assert(detail.description.includes('Fallback'));
+  assert(detail.description.includes('Fallback Project'));
+  assert(detail.description.includes('Some body content'));
   assertEquals(detail.documentLinks.length, 0);
   assertMatch(detail.contentHash, /^[0-9a-f]{64}$/);
 });

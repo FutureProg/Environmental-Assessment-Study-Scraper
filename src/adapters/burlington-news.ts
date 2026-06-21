@@ -1,5 +1,5 @@
 import type { Adapter, DocumentLink, EAStudy, EAStudyDetail } from '../types.ts';
-import { absoluteUrl, fetchHtml, parseHtml, sha256Hex } from './http.ts';
+import { absoluteUrl, fetchHtml, fetchJson, parseHtml, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.burlington.ca';
 // The site's News module (`/Modules/News/...`) is WAF-blocked, but the NewsModule JSON
@@ -48,7 +48,12 @@ export function parseBurlingtonNewsFeed(json: string): EAStudy[] {
 
   for (const item of items as NewsFeedItem[]) {
     const link = (item?.link ?? '').trim();
-    if (!link || !link.includes(PROJECT_PATH)) continue;
+    if (!link) continue;
+    try {
+      if (!new URL(link, BASE_URL).pathname.startsWith(PROJECT_PATH)) continue;
+    } catch {
+      continue;
+    }
 
     const sourceUrl = absoluteUrl(link, BASE_URL);
     if (seen.has(sourceUrl)) continue;
@@ -74,7 +79,7 @@ export function parseBurlingtonNewsFeed(json: string): EAStudy[] {
  * Fetches Burlington's EA / capital-project news notices from the NewsModule JSON feed.
  */
 export async function fetchBurlingtonNewsStudies(): Promise<EAStudy[]> {
-  return parseBurlingtonNewsFeed(await fetchHtml(`${BASE_URL}${FEED_PATH}`));
+  return parseBurlingtonNewsFeed(await fetchJson(`${BASE_URL}${FEED_PATH}`));
 }
 
 /**
