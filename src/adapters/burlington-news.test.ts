@@ -62,6 +62,27 @@ Deno.test('parseBurlingtonNewsFeed: filters out non-construction news (festivals
   assertEquals(studies[0].title, 'New Street Bridge Replacement');
 });
 
+Deno.test('parseBurlingtonNewsFeed: resolves relative links (with and without leading slash) against the base', () => {
+  const json = JSON.stringify([
+    { title: 'Root Relative', link: '/en/news/current-city-projects-and-construction/root.aspx' },
+    { title: 'Bare Relative', link: 'en/news/current-city-projects-and-construction/bare.aspx' },
+    { title: 'Bad Link', link: 'http://[invalid' },
+  ]);
+  const studies = parseBurlingtonNewsFeed(json);
+  const byTitle = Object.fromEntries(studies.map((s) => [s.title, s.sourceUrl]));
+  // both relative forms resolve cleanly against the base — no `burlington.caen/...` corruption
+  assertEquals(
+    byTitle['Root Relative'],
+    'https://www.burlington.ca/en/news/current-city-projects-and-construction/root.aspx',
+  );
+  assertEquals(
+    byTitle['Bare Relative'],
+    'https://www.burlington.ca/en/news/current-city-projects-and-construction/bare.aspx',
+  );
+  assert(!('Bad Link' in byTitle)); // unparseable URL skipped
+  assertEquals(studies.length, 2);
+});
+
 Deno.test('parseBurlingtonNewsFeed: skips items missing link/title; collapses whitespace; tolerates bad json', () => {
   assertEquals(parseBurlingtonNewsFeed('not json'), []);
   assertEquals(parseBurlingtonNewsFeed('{"not":"an array"}'), []);

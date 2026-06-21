@@ -49,13 +49,15 @@ export function parseBurlingtonNewsFeed(json: string): EAStudy[] {
   for (const item of items as NewsFeedItem[]) {
     const link = (item?.link ?? '').trim();
     if (!link) continue;
+    let url: URL;
     try {
-      if (!new URL(link, BASE_URL).pathname.startsWith(PROJECT_PATH)) continue;
+      url = new URL(link, BASE_URL);
     } catch {
       continue;
     }
+    if (!url.pathname.startsWith(PROJECT_PATH)) continue;
 
-    const sourceUrl = absoluteUrl(link, BASE_URL);
+    const sourceUrl = url.href;
     if (seen.has(sourceUrl)) continue;
 
     const title = (item?.title ?? '').replace(/\s+/g, ' ').trim();
@@ -117,7 +119,7 @@ function extractDocumentLinks(root: Element | Document): DocumentLink[] {
  * - `description`: plain text from the page's `.ge-content` body blocks (truncated, used for classification)
  * - `engagementHtml`: inner HTML of those blocks with relative links resolved (used for engagement extraction)
  * - `documentLinks`: published documents from `/en/news/resources/` (title, URL; no date label)
- * - `contentHash`: SHA-256 of the body blocks' innerHTML + document hrefs
+ * - `contentHash`: SHA-256 of the body blocks' innerHTML + document titles+hrefs
  *
  * Falls back to `h1` + main content text for `description` when no `.ge-content` block exists.
  */
@@ -149,8 +151,9 @@ export async function parseBurlingtonNewsDetail(html: string): Promise<EAStudyDe
   const documentLinks = extractDocumentLinks(root);
 
   const contentHtml = contentBlocks.map((el) => el.innerHTML).join('');
-  const docHrefs = documentLinks.map((d) => d.url).join('');
-  const contentHash = await sha256Hex(contentHtml + docHrefs);
+  // Include both title and URL so a document re-title (same URL) still changes the hash.
+  const docFingerprint = documentLinks.map((d) => d.title + d.url).join('');
+  const contentHash = await sha256Hex(contentHtml + docFingerprint);
 
   return { description, engagementHtml, documentLinks, contentHash };
 }

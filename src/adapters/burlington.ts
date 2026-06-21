@@ -123,7 +123,7 @@ function extractDocumentLinks(doc: Document): DocumentLink[] {
  * - `description`: plain text from `.shared-content-block` content sections (truncated, used for classification)
  * - `engagementHtml`: inner HTML of those same blocks with relative links resolved (used for engagement extraction)
  * - `documentLinks`: structured rows from the document-library widget (title, URL; no date label)
- * - `contentHash`: SHA-256 of the content-block innerHTML + joined document URLs
+ * - `contentHash`: SHA-256 of the content-block innerHTML + joined document titles+URLs
  *
  * Falls back to `h1` + main/body text for `description` when no content block is present.
  */
@@ -155,8 +155,9 @@ export async function parseBurlingtonDetail(html: string): Promise<EAStudyDetail
   const documentLinks = extractDocumentLinks(doc);
 
   const contentHtml = contentBlocks.map((el) => el.innerHTML).join('');
-  const docHrefs = documentLinks.map((d) => d.url).join('');
-  const contentHash = await sha256Hex(contentHtml + docHrefs);
+  // Include both title and URL so a document re-title (same URL) still changes the hash.
+  const docFingerprint = documentLinks.map((d) => d.title + d.url).join('');
+  const contentHash = await sha256Hex(contentHtml + docFingerprint);
 
   return { description, engagementHtml, documentLinks, contentHash };
 }
