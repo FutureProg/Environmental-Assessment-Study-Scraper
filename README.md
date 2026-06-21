@@ -123,6 +123,20 @@ individual `.aspx` news pages load fine. This adapter uses both.
   (within `#mainContent`); published documents are collected from `/en/news/resources/`
   links. No per-document date label, so document `date` is left null.
 
+#### Considered but not adopted — events calendar (`events.burlington.ca`)
+
+The city's event calendar lists Public Information Centres (PICs) / open houses and looked
+like a candidate third source for engagement events. A spot-check (2026-06-21, next ~6
+months) found it **redundant** with the two adapters above: of 8 "Public Engagement"
+calendar entries, only 2 were EA-relevant PICs — one (Upper Middle Road reconstruction) was
+already written into its news-page body, and the other (Central Park Cricket) was already a
+Get Involved project. **Zero events lacked a counterpart in the two existing sources.** PIC
+dates/locations are already pulled by the per-study engagement extraction
+(`extractEngagementData`) from the scraped pages' body text, so the calendar would add a
+study↔event association layer for no new coverage. Worth revisiting only if PICs are later
+observed appearing on the calendar but not on any scraped page (the calendar was also empty
+beyond July, so the sample was small/seasonal).
+
 ### Town of Oakville
 
 - **Listing page:** Single, un-paginated page at `/transportation-roads/transportation-roads-studies-and-plans/environmental-assessment-studies/`
