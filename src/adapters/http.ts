@@ -57,12 +57,15 @@ export async function fetchJson(url: string): Promise<string> {
 
 /**
  * Resolves a possibly-relative href to an absolute URL against a base URL.
- * Handles https/http, protocol-relative `//`, and site-relative `/` paths.
+ * Handles absolute, protocol-relative, root-relative, and bare-relative paths.
+ * Falls back to returning the raw href if it cannot be parsed.
  */
 export function absoluteUrl(href: string, baseUrl: string): string {
-  if (href.startsWith('http://') || href.startsWith('https://')) return href;
-  if (href.startsWith('//')) return `https:${href}`;
-  return `${baseUrl}${href}`;
+  try {
+    return new URL(href, baseUrl).href;
+  } catch {
+    return href;
+  }
 }
 
 /** SHA-256 hex digest of a string — used for detail-page content hashing. */
