@@ -76,7 +76,7 @@ jobs:
                 repo: context.repo.repo,
                 job_id: job.id
               });
-              errorLogs.push({ jobName: job.name, logs: logs.data });
+              errorLogs.push({ jobName: job.name, logs: logs.data.slice(0, 5000) });
             }
 
             return {
