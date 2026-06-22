@@ -68,6 +68,21 @@ export function absoluteUrl(href: string, baseUrl: string): string {
   }
 }
 
+/**
+ * Rewrites relative `href="..."` attributes in a serialised HTML fragment to absolute URLs,
+ * so links remain clickable once the fragment is lifted out of its page context.
+ * Protocol-relative (`//host/…`) hrefs become `https://…`; root-relative (`/path`) hrefs are
+ * resolved against `baseUrl`. Absolute and already-resolved hrefs are left untouched.
+ *
+ * Operates on the string output of JSDOM's `innerHTML`, which always double-quotes
+ * attributes — hence the double-quote-only match. Shared by the per-municipality adapters.
+ */
+export function absolutiseHtmlHrefs(html: string, baseUrl: string): string {
+  return html
+    .replace(/href="(\/\/[^"]+)"/g, 'href="https:$1"')
+    .replace(/href="(\/[^"]+)"/g, `href="${baseUrl}$1"`);
+}
+
 /** SHA-256 hex digest of a string — used for detail-page content hashing. */
 export async function sha256Hex(input: string): Promise<string> {
   const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));

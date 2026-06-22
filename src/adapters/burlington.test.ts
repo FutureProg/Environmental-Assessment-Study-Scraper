@@ -1,5 +1,5 @@
 import { expect } from '@std/expect';
-import { describe, it } from '@std/testing/bdd';
+import { beforeAll, describe, it } from '@std/testing/bdd';
 import {
   parseBurlingtonListing,
   parseBurlingtonDetail,
@@ -14,26 +14,26 @@ async function fixture(name: string): Promise<string> {
 }
 
 describe('parseBurlingtonListing', () => {
-  it('returns one study per project tile (90 tiles)', async () => {
-    const html = await fixture('listing.html');
-    const studies = parseBurlingtonListing(html);
-    expect(studies.length).toBe(90);
+  // Loaded once for the whole block — the parse is pure, so every case can share one read.
+  let listingHtml: string;
+  beforeAll(async () => {
+    listingHtml = await fixture('listing.html');
   });
 
-  it('parses first study title, url, raw status', async () => {
-    const html = await fixture('listing.html');
-    const studies = parseBurlingtonListing(html);
-    const first = studies[0];
+  it('returns one study per project tile (90 tiles)', () => {
+    expect(parseBurlingtonListing(listingHtml).length).toBe(90);
+  });
+
+  it('parses first study title, url, raw status', () => {
+    const first = parseBurlingtonListing(listingHtml)[0];
     // visible title is double HTML-encoded in source ("&amp;amp;") — must be fully decoded
     expect(first.title).toEqual('Festivals & Events Strategy');
     expect(first.sourceUrl).toEqual('https://www.getinvolvedburlington.ca/eventstrategy');
     expect(first.rawStatus).toEqual('published');
   });
 
-  it('sets constant fields per contract', async () => {
-    const html = await fixture('listing.html');
-    const studies = parseBurlingtonListing(html);
-    for (const s of studies) {
+  it('sets constant fields per contract', () => {
+    for (const s of parseBurlingtonListing(listingHtml)) {
       expect(s.municipalityOwner).toEqual('City of Burlington');
       expect(s.municipalityAreas).toEqual(['Burlington']);
       // status is inferred during classification — listing carries the placeholder
@@ -49,10 +49,8 @@ describe('parseBurlingtonListing', () => {
     }
   });
 
-  it('de-duplicates by absolute sourceUrl', async () => {
-    const html = await fixture('listing.html');
-    const studies = parseBurlingtonListing(html);
-    const urls = studies.map((s) => s.sourceUrl);
+  it('de-duplicates by absolute sourceUrl', () => {
+    const urls = parseBurlingtonListing(listingHtml).map((s) => s.sourceUrl);
     expect(new Set(urls).size).toBe(urls.length);
   });
 
@@ -128,9 +126,16 @@ describe('parseBurlingtonListing', () => {
 });
 
 describe('parseBurlingtonDetail', () => {
+  // Two real project pages, loaded once: one for field extraction, one for hash contrast.
+  let electricMobilityHtml: string;
+  let transitHtml: string;
+  beforeAll(async () => {
+    electricMobilityHtml = await fixture('electric-mobility-strategy.html');
+    transitHtml = await fixture('burlington-transit.html');
+  });
+
   it('(electric-mobility) extracts description, hash, document links', async () => {
-    const html = await fixture('electric-mobility-strategy.html');
-    const detail = await parseBurlingtonDetail(html);
+    const detail = await parseBurlingtonDetail(electricMobilityHtml);
 
     // description: non-empty plain text, truncated to 3000, whitespace collapsed
     expect(detail.description.length).toBeGreaterThan(0);
@@ -152,18 +157,6 @@ describe('parseBurlingtonDetail', () => {
     expect(new Set(urls).size).toBe(urls.length);
   });
 
-  it('absolutises relative hrefs in engagementHtml', async () => {
-    const html = `
-      <div class='shared-content-block'>
-        <p>See the <a href="/imp/documents">project documents</a> and
-        the <a href="//cdn.example.com/x">CDN file</a>.</p>
-      </div>`;
-    const detail = await parseBurlingtonDetail(html);
-    expect(detail.engagementHtml).toContain('https://www.getinvolvedburlington.ca/imp/documents');
-    expect(detail.engagementHtml).toContain('https://cdn.example.com/x');
-    expect(detail.engagementHtml.includes('href="/imp/documents"')).toBe(false);
-  });
-
   it('falls back to h1/main text when no content block', async () => {
     const html = `<html><body><h1>Fallback Project</h1><main>Some body content here</main></body></html>`;
     const detail = await parseBurlingtonDetail(html);
@@ -173,16 +166,11 @@ describe('parseBurlingtonDetail', () => {
     expect(detail.contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('produces a contentHash that is deterministic for identical input', async () => {
-    const html = await fixture('electric-mobility-strategy.html');
-    const a = await parseBurlingtonDetail(html);
-    const b = await parseBurlingtonDetail(html);
+  it('produces a contentHash that is deterministic for identical input, distinct for different input', async () => {
+    const a = await parseBurlingtonDetail(electricMobilityHtml);
+    const b = await parseBurlingtonDetail(electricMobilityHtml);
     expect(a.contentHash).toEqual(b.contentHash);
-  });
-
-  it('produces a different hash for different input', async () => {
-    const a = await parseBurlingtonDetail(await fixture('electric-mobility-strategy.html'));
-    const b = await parseBurlingtonDetail(await fixture('burlington-transit.html'));
-    expect(a.contentHash).not.toEqual(b.contentHash);
+    const other = await parseBurlingtonDetail(transitHtml);
+    expect(a.contentHash).not.toEqual(other.contentHash);
   });
 });

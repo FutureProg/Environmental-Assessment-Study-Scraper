@@ -1,5 +1,5 @@
 import type { Adapter, DocumentLink, EAStudy, EAStudyDetail } from '../types.ts';
-import { absoluteUrl, fetchHtml, fetchJson, parseHtml, sha256Hex } from './http.ts';
+import { absolutiseHtmlHrefs, absoluteUrl, fetchHtml, fetchJson, parseHtml, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.burlington.ca';
 // The site's News module (`/Modules/News/...`) is WAF-blocked, but the NewsModule JSON
@@ -141,12 +141,13 @@ export async function parseBurlingtonNewsDetail(html: string): Promise<EAStudyDe
     description = [heading, body].filter(Boolean).join('\n\n').slice(0, 3000);
   }
 
-  const engagementHtml = contentBlocks
-    .map((el) => el.innerHTML.trim())
-    .filter(Boolean)
-    .join('\n\n')
-    .replace(/href="(\/\/[^"]+)"/g, `href="https:$1"`)
-    .replace(/href="(\/[^"]+)"/g, `href="${BASE_URL}$1"`);
+  const engagementHtml = absolutiseHtmlHrefs(
+    contentBlocks
+      .map((el) => el.innerHTML.trim())
+      .filter(Boolean)
+      .join('\n\n'),
+    BASE_URL,
+  );
 
   const documentLinks = extractDocumentLinks(root);
 

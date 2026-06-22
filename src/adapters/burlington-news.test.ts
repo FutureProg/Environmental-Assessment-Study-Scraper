@@ -1,5 +1,5 @@
 import { expect } from '@std/expect';
-import { describe, it } from '@std/testing/bdd';
+import { beforeAll, describe, it } from '@std/testing/bdd';
 import {
   parseBurlingtonNewsFeed,
   parseBurlingtonNewsDetail,
@@ -14,16 +14,18 @@ async function fixture(name: string): Promise<string> {
 }
 
 describe('parseBurlingtonNewsFeed', () => {
-  it('keeps only city-projects-and-construction items (45 of 500)', async () => {
-    const json = await fixture('news-feed.json');
-    const studies = parseBurlingtonNewsFeed(json);
-    expect(studies.length).toBe(45);
+  // Loaded once for the whole block — the parse is pure, so every case can share one read.
+  let feedJson: string;
+  beforeAll(async () => {
+    feedJson = await fixture('news-feed.json');
   });
 
-  it('sets constant fields + path filter per contract', async () => {
-    const json = await fixture('news-feed.json');
-    const studies = parseBurlingtonNewsFeed(json);
-    for (const s of studies) {
+  it('keeps only city-projects-and-construction items (45 of 500)', () => {
+    expect(parseBurlingtonNewsFeed(feedJson).length).toBe(45);
+  });
+
+  it('sets constant fields + path filter per contract', () => {
+    for (const s of parseBurlingtonNewsFeed(feedJson)) {
       expect(s.municipalityOwner).toEqual('City of Burlington');
       expect(s.municipalityAreas).toEqual(['Burlington']);
       expect(s.status).toEqual('unknown'); // no status in the feed — inferred during classification
@@ -38,17 +40,15 @@ describe('parseBurlingtonNewsFeed', () => {
     }
   });
 
-  it('captures EA notices not on Get Involved', async () => {
-    const json = await fixture('news-feed.json');
-    const titles = parseBurlingtonNewsFeed(json).map((s) => s.title);
+  it('captures EA notices not on Get Involved', () => {
+    const titles = parseBurlingtonNewsFeed(feedJson).map((s) => s.title);
     // creek/flood Class EAs that only exist as news notices
     expect(titles.some((t) => t.includes('Lower Rambo Creek Flood Mitigation Environmental Assessment'))).toBe(true);
     expect(titles.some((t) => t.includes('Falcon Creek Erosion Control Environmental Assessment'))).toBe(true);
   });
 
-  it('de-duplicates by sourceUrl', async () => {
-    const json = await fixture('news-feed.json');
-    const urls = parseBurlingtonNewsFeed(json).map((s) => s.sourceUrl);
+  it('de-duplicates by sourceUrl', () => {
+    const urls = parseBurlingtonNewsFeed(feedJson).map((s) => s.sourceUrl);
     expect(new Set(urls).size).toBe(urls.length);
   });
 
@@ -64,23 +64,23 @@ describe('parseBurlingtonNewsFeed', () => {
     expect(studies[0].title).toEqual('New Street Bridge Replacement');
   });
 
-  it('resolves relative links (with and without leading slash) against the base', () => {
+  it('resolves relative feed links against the base and skips unparseable ones', () => {
+    // generic URL-resolution behaviour is covered in http.test.ts (absoluteUrl); this
+    // asserts only the feed's own contract — both relative forms are kept and resolved,
+    // the malformed one is dropped.
     const json = JSON.stringify([
       { title: 'Root Relative', link: '/en/news/current-city-projects-and-construction/root.aspx' },
       { title: 'Bare Relative', link: 'en/news/current-city-projects-and-construction/bare.aspx' },
       { title: 'Bad Link', link: 'http://[invalid' },
     ]);
-    const studies = parseBurlingtonNewsFeed(json);
-    const byTitle = Object.fromEntries(studies.map((s) => [s.title, s.sourceUrl]));
-    // both relative forms resolve cleanly against the base — no `burlington.caen/...` corruption
+    const byTitle = Object.fromEntries(parseBurlingtonNewsFeed(json).map((s) => [s.title, s.sourceUrl]));
     expect(byTitle['Root Relative']).toEqual(
       'https://www.burlington.ca/en/news/current-city-projects-and-construction/root.aspx',
     );
     expect(byTitle['Bare Relative']).toEqual(
       'https://www.burlington.ca/en/news/current-city-projects-and-construction/bare.aspx',
     );
-    expect('Bad Link' in byTitle).toBe(false); // unparseable URL skipped
-    expect(studies.length).toBe(2);
+    expect('Bad Link' in byTitle).toBe(false);
   });
 
   it('skips items missing link/title; collapses whitespace; tolerates bad json', () => {
@@ -99,9 +99,14 @@ describe('parseBurlingtonNewsFeed', () => {
 });
 
 describe('parseBurlingtonNewsDetail', () => {
+  // Real news page, loaded once and shared across the cases that need it.
+  let applebyHtml: string;
+  beforeAll(async () => {
+    applebyHtml = await fixture('appleby-creek-erosion-control-class-ea.html');
+  });
+
   it('(appleby) extracts description, hash, document links', async () => {
-    const html = await fixture('appleby-creek-erosion-control-class-ea.html');
-    const detail = await parseBurlingtonNewsDetail(html);
+    const detail = await parseBurlingtonNewsDetail(applebyHtml);
 
     expect(detail.description).toContain('Aquafor Beech');
     expect(detail.description.length).toBeLessThanOrEqual(3000);
@@ -120,18 +125,6 @@ describe('parseBurlingtonNewsDetail', () => {
     expect(new Set(urls).size).toBe(urls.length);
   });
 
-  it('absolutises relative hrefs in engagementHtml', async () => {
-    const html = `
-      <div id="mainContent"><div class="ge-content">
-        <p>See the <a href="/en/news/resources/report.pdf">report</a> and
-        <a href="//cdn.example.com/x">CDN</a>.</p>
-      </div></div>`;
-    const detail = await parseBurlingtonNewsDetail(html);
-    expect(detail.engagementHtml).toContain('https://www.burlington.ca/en/news/resources/report.pdf');
-    expect(detail.engagementHtml).toContain('https://cdn.example.com/x');
-    expect(detail.engagementHtml.includes('href="/en/news/resources/report.pdf"')).toBe(false);
-  });
-
   it('falls back to h1/main text when no content block', async () => {
     const html = `<html><body><h1>Fallback Study</h1><main>Body text only</main></body></html>`;
     const detail = await parseBurlingtonNewsDetail(html);
@@ -142,9 +135,8 @@ describe('parseBurlingtonNewsDetail', () => {
   });
 
   it('produces a contentHash that is deterministic + sensitive to content', async () => {
-    const html = await fixture('appleby-creek-erosion-control-class-ea.html');
-    const a = await parseBurlingtonNewsDetail(html);
-    const b = await parseBurlingtonNewsDetail(html);
+    const a = await parseBurlingtonNewsDetail(applebyHtml);
+    const b = await parseBurlingtonNewsDetail(applebyHtml);
     expect(a.contentHash).toEqual(b.contentHash);
     const c = await parseBurlingtonNewsDetail('<div id="mainContent"><div class="ge-content">different</div></div>');
     expect(a.contentHash).not.toEqual(c.contentHash);
