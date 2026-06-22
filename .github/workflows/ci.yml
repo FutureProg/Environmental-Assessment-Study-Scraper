@@ -25,8 +25,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/deno
-          key: deno-${{ hashFiles('deno.lock') }}
-          restore-keys: deno-
+          key: deno-v2-${{ hashFiles('deno.lock') }}
+          restore-keys: deno-v2-
 
       - name: Lint
         run: deno lint src/ main.ts
