@@ -39,13 +39,48 @@ export async function fetchDocument(url: string): Promise<Document> {
 }
 
 /**
+ * Fetches a URL and returns the response body as text, without browser-specific HTML headers.
+ * Use for JSON API endpoints where sending `Accept: text/html` would be semantically wrong.
+ */
+export async function fetchJson(url: string): Promise<string> {
+  await sleep(1000);
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      'Accept': 'application/json,*/*;q=0.8',
+      'Accept-Language': 'en-CA,en;q=0.9',
+    },
+  });
+  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  return response.text();
+}
+
+/**
  * Resolves a possibly-relative href to an absolute URL against a base URL.
- * Handles https/http, protocol-relative `//`, and site-relative `/` paths.
+ * Handles absolute, protocol-relative, root-relative, and bare-relative paths.
+ * Falls back to returning the raw href if it cannot be parsed.
  */
 export function absoluteUrl(href: string, baseUrl: string): string {
-  if (href.startsWith('http://') || href.startsWith('https://')) return href;
-  if (href.startsWith('//')) return `https:${href}`;
-  return `${baseUrl}${href}`;
+  try {
+    return new URL(href, baseUrl).href;
+  } catch {
+    return href;
+  }
+}
+
+/**
+ * Rewrites relative `href="..."` attributes in a serialised HTML fragment to absolute URLs,
+ * so links remain clickable once the fragment is lifted out of its page context.
+ * Protocol-relative (`//host/…`) hrefs become `https://…`; root-relative (`/path`) hrefs are
+ * resolved against `baseUrl`. Absolute and already-resolved hrefs are left untouched.
+ *
+ * Operates on the string output of JSDOM's `innerHTML`, which always double-quotes
+ * attributes — hence the double-quote-only match. Shared by the per-municipality adapters.
+ */
+export function absolutiseHtmlHrefs(html: string, baseUrl: string): string {
+  return html
+    .replace(/href="(\/\/[^"]+)"/g, 'href="https:$1"')
+    .replace(/href="(\/[^"]+)"/g, `href="${baseUrl}$1"`);
 }
 
 /** SHA-256 hex digest of a string — used for detail-page content hashing. */
