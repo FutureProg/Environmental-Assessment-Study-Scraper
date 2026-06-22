@@ -27,11 +27,6 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: read
       actions: read
     steps:
       - name: Checkout repository

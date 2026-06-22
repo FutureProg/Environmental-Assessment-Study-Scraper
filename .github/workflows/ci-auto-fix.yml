@@ -16,10 +16,6 @@ permissions:
   pull-requests: write
   issues: write
   actions: read
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: read
 
 jobs:
   auto-fix:
