@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EAStudy, EAClassification } from './types.ts';
-import { FailureError } from './failures.ts';
+import { describeApiError, FailureError } from './failures.ts';
 import { buildToolFailureData } from './github.ts';
 
 const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
@@ -27,9 +27,8 @@ interface ClassifyOptions {
 }
 
 export async function classifyStudy(study: EAStudy, opts: ClassifyOptions = {}): Promise<EAClassification> {
-  const descriptionSection = study.detail?.description
-    ? `\nDescription:\n${study.detail.description.slice(0, 3000)}`
-    : '';
+  const rawDescription = study.detail?.description?.slice(0, 3000) ?? '';
+  const descriptionSection = rawDescription ? `\nDescription:\n${rawDescription}` : '';
 
   const properties: Record<string, unknown> = {
     scope: {
@@ -50,31 +49,38 @@ export async function classifyStudy(study: EAStudy, opts: ClassifyOptions = {}):
     required.push('status');
   }
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 512,
-    system: opts.inferStatus ? SYSTEM_PROMPT + STATUS_GUIDANCE : SYSTEM_PROMPT,
-    tools: [{
-      name: 'classify_ea_study',
-      description: 'Record the classification for this EA study',
-      input_schema: {
-        type: 'object' as const,
-        properties,
-        required,
-      },
-    }],
-    tool_choice: { type: 'tool', name: 'classify_ea_study' },
-    messages: [{
-      role: 'user',
-      content: `Classify this EA study:\nTitle: ${study.title}\nMunicipality: ${study.municipalityOwner}${descriptionSection}`,
-    }],
-  });
+  let response;
+  try {
+    response = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 512,
+      system: opts.inferStatus ? SYSTEM_PROMPT + STATUS_GUIDANCE : SYSTEM_PROMPT,
+      tools: [{
+        name: 'classify_ea_study',
+        description: 'Record the classification for this EA study',
+        input_schema: {
+          type: 'object' as const,
+          properties,
+          required,
+        },
+      }],
+      tool_choice: { type: 'tool', name: 'classify_ea_study' },
+      messages: [{
+        role: 'user',
+        content: `Classify this EA study:\nTitle: ${study.title}\nMunicipality: ${study.municipalityOwner}${descriptionSection}`,
+      }],
+    });
+  } catch (err) {
+    const { summary, detail } = describeApiError(err);
+    const toolFailureData = buildToolFailureData('description sent', rawDescription, 'raw error detail', detail);
+    throw new FailureError(summary, toolFailureData);
+  }
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
     const toolFailureData = buildToolFailureData(
       'description sent',
-      descriptionSection || '(none)',
+      rawDescription,
       'raw response content',
       JSON.stringify(response.content, null, 2),
     );
