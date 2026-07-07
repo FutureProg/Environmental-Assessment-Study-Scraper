@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EngagementEvent, StudyDocument, EAStudyDetail } from './types.ts';
+import { FailureError } from './failures.ts';
+import { buildToolFailureData } from './github.ts';
 
 const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
 
@@ -84,16 +86,25 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
-    throw new Error('Engagement extractor did not return a tool_use block');
+    const toolFailureData = buildToolFailureData(
+      'engagement HTML sent',
+      detail.engagementHtml,
+      'raw response content',
+      JSON.stringify(response.content, null, 2),
+    );
+    throw new FailureError('Engagement extractor did not return a tool_use block', toolFailureData);
   }
 
   const events: EngagementEvent[] = [];
   const result = toolUse.input as { events: RawItem[] };
   if (!result || !Array.isArray(result.events)) {
-    console.debug(response.content);
-    console.debug(detail.engagementHtml);
-    console.debug('Unexpected engagement extractor output:', toolUse.input);
-    throw new Error('Engagement extractor returned invalid data');
+    const toolFailureData = buildToolFailureData(
+      'engagement HTML sent',
+      detail.engagementHtml,
+      'raw tool_use.input',
+      JSON.stringify(toolUse.input, null, 2),
+    );
+    throw new FailureError('Engagement extractor returned invalid data', toolFailureData);
   }
 
   for (const item of result.events) {

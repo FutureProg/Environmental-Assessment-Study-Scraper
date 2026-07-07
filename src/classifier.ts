@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EAStudy, EAClassification } from './types.ts';
+import { FailureError } from './failures.ts';
+import { buildToolFailureData } from './github.ts';
 
 const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
 
@@ -70,7 +72,13 @@ export async function classifyStudy(study: EAStudy, opts: ClassifyOptions = {}):
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
-    throw new Error('Classifier did not return a tool_use block');
+    const toolFailureData = buildToolFailureData(
+      'description sent',
+      descriptionSection || '(none)',
+      'raw response content',
+      JSON.stringify(response.content, null, 2),
+    );
+    throw new FailureError('Classifier did not return a tool_use block', toolFailureData);
   }
 
   return toolUse.input as EAClassification;
