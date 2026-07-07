@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EngagementEvent, StudyDocument, EAStudyDetail } from './types.ts';
-import { FailureError } from './failures.ts';
+import { describeApiError, FailureError } from './failures.ts';
 import { buildToolFailureData } from './github.ts';
 
 const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
@@ -48,41 +48,48 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
     return { events: [], documents: Array.from(documentMap.values()) };
   }
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,    
-    tools: [{
-      name: 'extract_engagement_events',
-      description: 'Record all public engagement events found in this EA study page',
-      input_schema: {
-        type: 'object' as const,
-        properties: {
-          events: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                type:      { type: 'string', enum: ['open_house', 'comment_deadline', 'hearing', 'document'] },
-                eventDate: { type: ['string', 'null'], description: 'ISO start date/datetime: YYYY-MM-DDTHH:MM if time known, YYYY-MM-DD if date only, null if unknown' },
-                endDate:   { type: ['string', 'null'], description: 'ISO end date/datetime: YYYY-MM-DDTHH:MM if time known, YYYY-MM-DD if date only, null if single-day or unknown' },
-                location:  { type: ['string', 'null'] },
-                url:       { type: ['string', 'null'] },
-                notes:     { type: ['string', 'null'], description: 'Document title or brief event context' },
+  let response;
+  try {
+    response = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      tools: [{
+        name: 'extract_engagement_events',
+        description: 'Record all public engagement events found in this EA study page',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            events: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type:      { type: 'string', enum: ['open_house', 'comment_deadline', 'hearing', 'document'] },
+                  eventDate: { type: ['string', 'null'], description: 'ISO start date/datetime: YYYY-MM-DDTHH:MM if time known, YYYY-MM-DD if date only, null if unknown' },
+                  endDate:   { type: ['string', 'null'], description: 'ISO end date/datetime: YYYY-MM-DDTHH:MM if time known, YYYY-MM-DD if date only, null if single-day or unknown' },
+                  location:  { type: ['string', 'null'] },
+                  url:       { type: ['string', 'null'] },
+                  notes:     { type: ['string', 'null'], description: 'Document title or brief event context' },
+                },
+                required: ['type', 'eventDate', 'endDate', 'location', 'url', 'notes'],
               },
-              required: ['type', 'eventDate', 'endDate', 'location', 'url', 'notes'],
             },
           },
+          required: ['events'],
         },
-        required: ['events'],
-      },
-    }],
-    tool_choice: { type: 'tool', name: 'extract_engagement_events' },
-    messages: [{
-      role: 'user',
-      content: `Extract engagement events from this EA study page HTML:\n\n\`\`\`html\n${detail.engagementHtml}\`\`\``,
-    }],
-  });
+      }],
+      tool_choice: { type: 'tool', name: 'extract_engagement_events' },
+      messages: [{
+        role: 'user',
+        content: `Extract engagement events from this EA study page HTML:\n\n\`\`\`html\n${detail.engagementHtml}\`\`\``,
+      }],
+    });
+  } catch (err) {
+    const { summary, detail: errDetail } = describeApiError(err);
+    const toolFailureData = buildToolFailureData('engagement HTML sent', detail.engagementHtml, 'raw error detail', errDetail);
+    throw new FailureError(summary, toolFailureData);
+  }
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
@@ -101,8 +108,8 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
     const toolFailureData = buildToolFailureData(
       'engagement HTML sent',
       detail.engagementHtml,
-      'raw tool_use.input',
-      JSON.stringify(toolUse.input, null, 2),
+      'raw response content',
+      JSON.stringify(response.content, null, 2),
     );
     throw new FailureError('Engagement extractor returned invalid data', toolFailureData);
   }
