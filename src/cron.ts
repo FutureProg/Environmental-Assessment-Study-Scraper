@@ -3,7 +3,7 @@ import { classifyStudy } from './classifier.ts';
 import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
 import { sendDiscordChanges } from './discord.ts';
-import { closeKv, reportFailure } from './failures.ts';
+import { closeKv, reportAndRethrow, reportFailure } from './failures.ts';
 import type { Adapter, EAClassification, EAStudy } from './types.ts';
 
 export async function cronHandler() {
@@ -43,8 +43,7 @@ async function processStudy(adapter: Adapter, study: EAStudy) {
   try {
     study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
   } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    await reportFailure({ stage: 'adapter', study, error });
+    await reportAndRethrow('adapter', study, err);
     throw err;
   }
 
@@ -56,8 +55,7 @@ async function processStudy(adapter: Adapter, study: EAStudy) {
     try {
       classification = await classifyStudy(study, { inferStatus: adapter.inferStatus });
     } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      await reportFailure({ stage: 'classifier', study, error });
+      await reportAndRethrow('classifier', study, err);
       throw err;
     }
     // For sources without a structured status field, adopt the inferred status.
@@ -92,8 +90,7 @@ async function processStudy(adapter: Adapter, study: EAStudy) {
     try {
       engagementResult = await extractEngagementData(study.detail);
     } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      await reportFailure({ stage: 'engagement', study, error });
+      await reportAndRethrow('engagement', study, err);
       throw err;
     }
     const { events: engagementEvents, documents } = engagementResult;
