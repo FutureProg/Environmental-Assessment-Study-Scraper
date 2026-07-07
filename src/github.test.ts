@@ -5,6 +5,7 @@ import {
   buildToolFailureData,
   buildRecurrenceComment,
   buildRegressionComment,
+  extractAdapterFromIssueTitle,
   extractToolCallInput,
   extractToolFailureDataFromIssueBody,
   TOOL_FAILURE_DATA_SUMMARY,
@@ -63,7 +64,7 @@ Deno.test('buildFailureIssueBody: wraps tool failure data in a collapsed details
 // ---------- extractToolFailureDataFromIssueBody (replay CLI round-trip) ----------
 
 Deno.test('extractToolFailureDataFromIssueBody: round-trips what buildFailureIssueBody wrote', () => {
-  const toolFailureData = '=== INPUT (engagement HTML sent) ===\n<div>hello</div>\n=== OUTPUT (raw tool_use.input) ===\n{}';
+  const toolFailureData = buildToolFailureData('engagement HTML sent', '<div>hello</div>', 'raw tool_use.input', '{}');
   const body = buildFailureIssueBody('engagement', 'Study', 'https://example.com', 'boom', toolFailureData);
   assertEquals(extractToolFailureDataFromIssueBody(body), toolFailureData);
 });
@@ -75,8 +76,8 @@ Deno.test('extractToolFailureDataFromIssueBody: returns null when there is no de
 
 // ---------- extractToolCallInput ----------
 
-Deno.test('extractToolCallInput: pulls the INPUT section out, stopping before OUTPUT', () => {
-  const toolFailureData = '=== INPUT (engagement HTML sent) ===\n<div>hello</div>\n=== OUTPUT (raw tool_use.input) ===\n{}';
+Deno.test('extractToolCallInput: pulls the base64-decoded INPUT line out', () => {
+  const toolFailureData = buildToolFailureData('engagement HTML sent', '<div>hello</div>', 'raw tool_use.input', '{}');
   assertEquals(extractToolCallInput(toolFailureData), '<div>hello</div>');
 });
 
@@ -89,6 +90,39 @@ Deno.test('extractToolCallInput: returns null when there is no INPUT marker', ()
 Deno.test('buildToolFailureData -> extractToolCallInput: round-trips the input', () => {
   const toolFailureData = buildToolFailureData('engagement HTML sent', '<div>hello</div>', 'raw tool_use.input', '{}');
   assertEquals(extractToolCallInput(toolFailureData), '<div>hello</div>');
+});
+
+Deno.test('buildToolFailureData: content containing literal "=== OUTPUT" and fenced backticks round-trips safely', () => {
+  const trickyInput = 'some html\n=== OUTPUT (fake) ===\nmore html with a ```code fence``` inside it';
+  const toolFailureData = buildToolFailureData('engagement HTML sent', trickyInput, 'raw tool_use.input', '{}');
+  assertEquals(extractToolCallInput(toolFailureData), trickyInput);
+
+  const body = buildFailureIssueBody('engagement', 'Study', 'https://example.com', 'boom', toolFailureData);
+  const extracted = extractToolFailureDataFromIssueBody(body);
+  assertEquals(extracted, toolFailureData);
+  assertEquals(extracted !== null ? extractToolCallInput(extracted) : null, trickyInput);
+});
+
+Deno.test('buildToolFailureData: truncates oversized segments instead of producing an unbounded string', () => {
+  const huge = 'x'.repeat(100_000);
+  const toolFailureData = buildToolFailureData('engagement HTML sent', huge, 'raw tool_use.input', '{}');
+  // Base64 inflates size ~4/3x; the whole toolFailureData string should stay well under
+  // GitHub's ~65536-char issue body limit even for a single oversized segment.
+  assert(toolFailureData.length < 40_000);
+  const decoded = extractToolCallInput(toolFailureData);
+  assert(decoded !== null);
+  assertStringIncludes(decoded!, '...[truncated');
+});
+
+// ---------- extractAdapterFromIssueTitle ----------
+
+Deno.test('extractAdapterFromIssueTitle: round-trips what buildFailureIssueTitle wrote', () => {
+  const title = buildFailureIssueTitle('engagement', 'Town of Oakville', 'Kerr St Study');
+  assertEquals(extractAdapterFromIssueTitle(title), 'Town of Oakville');
+});
+
+Deno.test('extractAdapterFromIssueTitle: returns null for an unrecognised title format', () => {
+  assertEquals(extractAdapterFromIssueTitle('some other issue title'), null);
 });
 
 // ---------- stageFromLabel ----------

@@ -18,6 +18,16 @@ export function buildFailureIssueTitle(stage: FailureStage, adapter: string, stu
   return `[${stage}] ${adapter} — ${studyTitle}`;
 }
 
+/**
+ * Reverse of buildFailureIssueTitle() — used by the replay CLI to recover which adapter
+ * produced a failure, so it can look up that adapter's real inferStatus setting instead
+ * of guessing.
+ */
+export function extractAdapterFromIssueTitle(title: string): string | null {
+  const match = /^\[[^\]]+\]\s+(.+?)\s+—\s+/.exec(title);
+  return match ? match[1] : null;
+}
+
 export function buildFailureIssueBody(
   stage: FailureStage,
   studyTitle: string,
@@ -49,23 +59,55 @@ export function buildFailureIssueBody(
   return lines.join('\n');
 }
 
+// Raw scraped HTML/API responses are untrusted and can legitimately contain a line that
+// looks like "=== OUTPUT" or a literal ``` sequence. Base64-encoding each segment (after
+// truncating to a safe size) means the embedded content can never collide with the
+// "=== INPUT/OUTPUT ===" markers or the outer ``` fence in buildFailureIssueBody — the
+// encoded line is guaranteed to contain neither backticks nor newlines.
+const MAX_SEGMENT_CHARS = 20_000;
+const BASE64_CHUNK_SIZE = 0x8000;
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}\n...[truncated, ${text.length - max} more chars]` : text;
+}
+
+function toBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE));
+  }
+  return btoa(binary);
+}
+
+function fromBase64(encoded: string): string {
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
 /**
  * Builds a toolFailureData string for FailureError, in the "=== INPUT/OUTPUT ===" shape
  * extractToolCallInput() parses back out. Centralised here so the writer (classifier.ts,
  * engagement.ts) and the reader (extractToolCallInput, used by the replay CLI) can't drift.
+ * Each segment is truncated (large scraped pages can otherwise blow past GitHub's ~65536-char
+ * issue body limit) and base64-encoded (see MAX_SEGMENT_CHARS comment above) before embedding.
  */
 export function buildToolFailureData(inputLabel: string, input: string, outputLabel: string, output: string): string {
   return [
     `=== INPUT (${inputLabel}) ===`,
-    input,
+    toBase64(truncate(input, MAX_SEGMENT_CHARS)),
     `=== OUTPUT (${outputLabel}) ===`,
-    output,
+    toBase64(truncate(output, MAX_SEGMENT_CHARS)),
   ].join('\n');
 }
 
 /**
  * Pulls the tool failure data back out of an issue body produced by
- * buildFailureIssueBody(), or null if the body has no such block.
+ * buildFailureIssueBody(), or null if the body has no such block. Scanning for the first
+ * closing ``` is safe here because buildToolFailureData's output only ever contains static
+ * marker text plus base64 — never a raw backtick from untrusted scraped content.
  */
 export function extractToolFailureDataFromIssueBody(body: string): string | null {
   const summaryTag = `<summary>${TOOL_FAILURE_DATA_SUMMARY}</summary>`;
@@ -83,15 +125,20 @@ export function extractToolFailureDataFromIssueBody(body: string): string | null
 
 /**
  * Pulls the "=== INPUT ... ===" section back out of a toolFailureData string built
- * by classifier.ts / engagement.ts's FailureError sites.
+ * by classifier.ts / engagement.ts's FailureError sites. The input is base64-encoded
+ * on a single line immediately after the marker (see buildToolFailureData), so this is
+ * a direct decode rather than a scan for a closing delimiter — the embedded content
+ * can't be mistaken for a marker regardless of what it contains.
  */
 export function extractToolCallInput(toolFailureData: string): string | null {
   const lines = toolFailureData.split('\n');
   const startIdx = lines.findIndex((l) => l.startsWith('=== INPUT'));
-  if (startIdx === -1) return null;
-  const endIdx = lines.findIndex((l, i) => i > startIdx && l.startsWith('=== OUTPUT'));
-  const section = lines.slice(startIdx + 1, endIdx === -1 ? undefined : endIdx);
-  return section.join('\n');
+  if (startIdx === -1 || startIdx + 1 >= lines.length) return null;
+  try {
+    return fromBase64(lines[startIdx + 1]);
+  } catch {
+    return null;
+  }
 }
 
 export function buildRecurrenceComment(occurrenceCount: number, timestamp: string): string {
@@ -125,7 +172,7 @@ export async function ensureLabelsExist(): Promise<void> {
     { name: STAGE_LABELS.engagement, color: 'bfd4f2', description: "Failure in Claude's engagement/document extraction tool call" },
   ];
 
-  for (const label of labels) {
+  const results = await Promise.all(labels.map(async (label) => {
     const res = await fetch(`${API_BASE}/labels`, {
       method: 'POST',
       headers: authHeaders(),
@@ -134,10 +181,14 @@ export async function ensureLabelsExist(): Promise<void> {
     // 422 means the label already exists — fine, ignore.
     if (!res.ok && res.status !== 422) {
       console.error(`Failed to create label ${label.name}: ${res.status} ${await res.text()}`);
+      return false;
     }
-  }
+    return true;
+  }));
 
-  labelsEnsured = true;
+  // Only remember success when every label actually exists — otherwise a transient
+  // failure (bad token, rate limit) would permanently skip retrying for this process.
+  labelsEnsured = results.every(Boolean);
 }
 
 export function stageLabel(stage: FailureStage): string {
@@ -162,7 +213,7 @@ export async function createGithubIssue(title: string, body: string, labels: str
   return await res.json();
 }
 
-export async function getGithubIssue(issueNumber: number): Promise<{ state: 'open' | 'closed'; body: string | null; labels: { name: string }[] }> {
+export async function getGithubIssue(issueNumber: number): Promise<{ state: 'open' | 'closed'; title: string; body: string | null; labels: { name: string }[] }> {
   const res = await fetch(`${API_BASE}/issues/${issueNumber}`, {
     headers: authHeaders(),
   });
