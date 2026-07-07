@@ -1,6 +1,7 @@
-import { extractToolCallInput, extractToolFailureDataFromIssueBody, getGithubIssue, stageFromLabel } from '../src/github.ts';
+import { extractAdapterFromIssueTitle, extractToolCallInput, extractToolFailureDataFromIssueBody, getGithubIssue, stageFromLabel } from '../src/github.ts';
 import { classifyStudy } from '../src/classifier.ts';
 import { extractEngagementData } from '../src/engagement.ts';
+import { adapters } from '../src/adapters/index.ts';
 import type { EAStudy, EAStudyDetail } from '../src/types.ts';
 
 async function main() {
@@ -18,13 +19,13 @@ async function main() {
   }
 
   const toolFailureData = issue.body ? extractToolFailureDataFromIssueBody(issue.body) : null;
-  if (!toolFailureData) {
+  if (toolFailureData === null) {
     console.error(`Issue #${issueNumber} has no tool failure data attached — nothing to replay.`);
     Deno.exit(1);
   }
 
   const input = extractToolCallInput(toolFailureData);
-  if (!input) {
+  if (input === null) {
     console.error(`Issue #${issueNumber}'s tool failure data has no "=== INPUT" section — cannot replay.`);
     Deno.exit(1);
   }
@@ -41,16 +42,21 @@ async function main() {
       break;
     }
     case 'classifier': {
+      const adapterName = extractAdapterFromIssueTitle(issue.title);
+      const matchedAdapter = adapterName ? adapters.find((a) => a.municipalityOwner === adapterName) : undefined;
+      if (!matchedAdapter) {
+        console.error(`Could not determine which adapter produced issue #${issueNumber} (title: "${issue.title}") — defaulting to inferStatus: false. Pass the real value manually if this adapter infers status.`);
+      }
       const study: EAStudy = {
         title: `replay-of-issue-${issueNumber}`,
         municipalityAreas: [],
-        municipalityOwner: 'unknown',
+        municipalityOwner: adapterName ?? 'unknown',
         status: 'unknown',
         rawStatus: '',
         sourceUrl: '',
         detail: { description: input, engagementHtml: '', documentLinks: [], contentHash: '' },
       };
-      console.log(JSON.stringify(await classifyStudy(study, { inferStatus: true }), null, 2));
+      console.log(JSON.stringify(await classifyStudy(study, { inferStatus: matchedAdapter?.inferStatus ?? false }), null, 2));
       break;
     }
     case 'adapter':
