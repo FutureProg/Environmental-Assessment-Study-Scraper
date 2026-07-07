@@ -78,7 +78,7 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
     tool_choice: { type: 'tool', name: 'extract_engagement_events' },
     messages: [{
       role: 'user',
-      content: `Extract engagement events from this EA study page HTML:\n\n${detail.engagementHtml}`,
+      content: `Extract engagement events from this EA study page HTML:\n\n\`\`\`html\n${detail.engagementHtml}\`\`\``,
     }],
   });
 
