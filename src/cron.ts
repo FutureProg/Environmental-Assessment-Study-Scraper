@@ -3,6 +3,7 @@ import { classifyStudy } from './classifier.ts';
 import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
 import { sendDiscordChanges } from './discord.ts';
+import { closeKv, reportFailure } from './failures.ts';
 import type { Adapter, EAClassification, EAStudy } from './types.ts';
 
 export async function cronHandler() {
@@ -11,10 +12,16 @@ export async function cronHandler() {
       await runAdapter(adapter);
     } catch (err) {
       console.error(`[${adapter.municipalityOwner}] adapter failed:`, err);
+      await reportFailure({
+        stage: 'adapter',
+        study: { title: '(listing page)', sourceUrl: '', municipalityOwner: adapter.municipalityOwner },
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
     }
   }
 
   await closeDb();
+  closeKv();
   console.log('Done');
 }
 
@@ -33,14 +40,26 @@ async function runAdapter(adapter: Adapter) {
 }
 
 async function processStudy(adapter: Adapter, study: EAStudy) {
-  study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
+  try {
+    study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    await reportFailure({ stage: 'adapter', study, error });
+    throw err;
+  }
 
   const stored = await getStoredAssessment(study.title, study.municipalityOwner);
   const contentChanged = stored === null || stored.contentHash !== study.detail.contentHash;
 
   let classification: EAClassification;
   if (contentChanged) {
-    classification = await classifyStudy(study, { inferStatus: adapter.inferStatus });
+    try {
+      classification = await classifyStudy(study, { inferStatus: adapter.inferStatus });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      await reportFailure({ stage: 'classifier', study, error });
+      throw err;
+    }
     // For sources without a structured status field, adopt the inferred status.
     // rawStatus is left as the adapter set it (empty) — it records the verbatim
     // scraped status, and inferred status was never scraped from the source.
@@ -69,7 +88,15 @@ async function processStudy(adapter: Adapter, study: EAStudy) {
   let newDocuments: Awaited<ReturnType<typeof syncDocuments>> = [];
 
   if (contentChanged) {
-    const { events: engagementEvents, documents } = await extractEngagementData(study.detail);
+    let engagementResult: Awaited<ReturnType<typeof extractEngagementData>>;
+    try {
+      engagementResult = await extractEngagementData(study.detail);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      await reportFailure({ stage: 'engagement', study, error });
+      throw err;
+    }
+    const { events: engagementEvents, documents } = engagementResult;
     newEvents = await syncEngagementEvents(diff.id, engagementEvents);
     newDocuments = await syncDocuments(diff.id, documents);
 
