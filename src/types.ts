@@ -62,6 +62,20 @@ export interface Adapter {
   fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail>;
 }
 
+export type FailureStage = 'adapter' | 'classifier' | 'engagement';
+
+export interface FailureRecord {
+  stage: FailureStage;
+  municipalityOwner: string;
+  studyTitle: string;
+  sourceUrl: string;
+  errorMessage: string;
+  firstSeenAt: string;   // ISO
+  lastSeenAt: string;    // ISO
+  occurrenceCount: number;
+  githubIssueNumber: number;
+}
+
 export interface AssessmentDiff {
   id: number;
   municipalities: string[];
