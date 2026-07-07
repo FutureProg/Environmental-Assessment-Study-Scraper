@@ -1,4 +1,5 @@
 import type { EAStudy, FailureRecord, FailureStage } from './types.ts';
+import { sha256Hex } from './adapters/http.ts';
 import {
   buildFailureIssueBody,
   buildFailureIssueTitle,
@@ -22,15 +23,30 @@ export class FailureError extends Error {
   }
 }
 
+/**
+ * Normalizes an Anthropic SDK/network error into a stable summary (used for the FailureError
+ * message and dedup signature) and the full detail (used for diagnostics). Raw error messages
+ * from a failed API call can embed non-deterministic content (request IDs, timing) that would
+ * otherwise defeat signature-based dedup between occurrences of the same underlying failure.
+ */
+export function describeApiError(err: unknown): { summary: string; detail: string } {
+  const detail = err instanceof Error ? err.message : String(err);
+  const status = err && typeof err === 'object' && 'status' in err && typeof (err as { status: unknown }).status === 'number'
+    ? (err as { status: number }).status
+    : undefined;
+  const summary = status !== undefined
+    ? `API request failed: HTTP ${status}`
+    : `API request failed: ${err instanceof Error ? err.constructor.name : 'unknown error'}`;
+  return { summary, detail };
+}
+
 export async function computeFailureSignatureKey(
   stage: FailureStage,
   adapter: string,
   studyTitle: string,
   errorMessage: string,
 ): Promise<string> {
-  const input = `${stage}|${adapter}|${studyTitle}|${errorMessage}`;
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return await sha256Hex(`${stage}|${adapter}|${studyTitle}|${errorMessage}`);
 }
 
 let _kv: Deno.Kv | null = null;
@@ -103,4 +119,20 @@ export async function reportFailure(params: ReportFailureParams): Promise<void> 
     // Failure reporting must never crash the cron run it's reporting on.
     console.error('reportFailure itself failed:', reportingError);
   }
+}
+
+/**
+ * Reports a pipeline-stage failure and rethrows it, for use at a stage call site's catch
+ * block: `catch (err) { await reportAndRethrow('classifier', study, err); }`. Centralises
+ * the coerce-report-rethrow pattern so every stage in cron.ts follows it identically and a
+ * newly added stage can't accidentally skip reporting.
+ */
+export async function reportAndRethrow(
+  stage: FailureStage,
+  study: ReportFailureParams['study'],
+  err: unknown,
+): Promise<never> {
+  const error = err instanceof Error ? err : new Error(String(err));
+  await reportFailure({ stage, study, error });
+  throw err;
 }
