@@ -5,6 +5,7 @@ import {
   buildFailureIssueTitle,
   buildRecurrenceComment,
   buildRegressionComment,
+  buildToolFailureData,
   commentOnGithubIssue,
   createGithubIssue,
   ensureLabelsExist,
@@ -17,8 +18,8 @@ import {
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export class FailureError extends Error {
-  constructor(message: string, public toolFailureData?: string) {
-    super(message);
+  constructor(message: string, public toolFailureData?: string, cause?: unknown) {
+    super(message, cause !== undefined ? { cause } : undefined);
     this.name = 'FailureError';
   }
 }
@@ -38,6 +39,23 @@ export function describeApiError(err: unknown): { summary: string; detail: strin
     ? `API request failed: HTTP ${status}`
     : `API request failed: ${err instanceof Error ? err.constructor.name : 'unknown error'}`;
   return { summary, detail };
+}
+
+/**
+ * Wraps a client.messages.create() call so every Claude tool-call site (classifier.ts,
+ * engagement.ts) fails identically: normalizes the error via describeApiError() for a stable
+ * dedup signature, attaches the raw input that was sent as diagnostic data, and preserves the
+ * original error as `cause` so console.error(err) at the catch site in cron.ts still surfaces
+ * the original SDK error's message/stack — not just the normalized summary.
+ */
+export async function callAnthropicOrFail<T>(inputLabel: string, rawInput: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const { summary, detail } = describeApiError(err);
+    const toolFailureData = buildToolFailureData(inputLabel, rawInput, 'raw error detail', detail);
+    throw new FailureError(summary, toolFailureData, err);
+  }
 }
 
 export async function computeFailureSignatureKey(
@@ -123,9 +141,17 @@ export async function reportFailure(params: ReportFailureParams): Promise<void> 
 
 /**
  * Reports a pipeline-stage failure and rethrows it, for use at a stage call site's catch
- * block: `catch (err) { await reportAndRethrow('classifier', study, err); }`. Centralises
- * the coerce-report-rethrow pattern so every stage in cron.ts follows it identically and a
- * newly added stage can't accidentally skip reporting.
+ * block: `catch (err) { await reportAndRethrow('classifier', study, err); throw err; }`.
+ * Centralises the coerce-report-rethrow pattern so every stage in cron.ts follows it
+ * identically and a newly added stage can't accidentally skip reporting.
+ *
+ * The trailing `throw err;` at the call site is required, not redundant: this function is
+ * declared `Promise<never>` (it always throws internally, since reportFailure never rejects),
+ * but TypeScript does not narrow control flow/definite-assignment through an awaited call to
+ * an imported `Promise<never>`-returning function the way it would a local `throw` statement —
+ * omitting the trailing throw compiles fine here but breaks a call site that needs to assign a
+ * variable in the try block for use afterward (e.g. `classification`/`engagementResult` in
+ * cron.ts's processStudy).
  */
 export async function reportAndRethrow(
   stage: FailureStage,

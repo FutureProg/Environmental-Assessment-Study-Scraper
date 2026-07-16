@@ -1,5 +1,6 @@
-import { assertEquals, assertNotEquals } from '@std/assert';
-import { computeFailureSignatureKey, describeApiError, FailureError } from './failures.ts';
+import { assertEquals, assertNotEquals, assertRejects } from '@std/assert';
+import { callAnthropicOrFail, computeFailureSignatureKey, describeApiError, FailureError } from './failures.ts';
+import { extractToolCallInput } from './github.ts';
 
 Deno.test('computeFailureSignatureKey: stable for identical inputs', async () => {
   const a = await computeFailureSignatureKey('engagement', 'Town of Oakville', 'Kerr St Study', 'boom');
@@ -40,6 +41,15 @@ Deno.test('FailureError: carries optional toolFailureData', () => {
   assertEquals(withoutData.toolFailureData, undefined);
 });
 
+Deno.test('FailureError: carries an optional cause so the original error is not lost', () => {
+  const original = new Error('the real underlying failure');
+  const wrapped = new FailureError('normalized summary', undefined, original);
+  assertEquals(wrapped.cause, original);
+
+  const withoutCause = new FailureError('normalized summary');
+  assertEquals(withoutCause.cause, undefined);
+});
+
 // ---------- describeApiError ----------
 
 function apiErrorLike(status: number, message: string): Error {
@@ -69,4 +79,36 @@ Deno.test('describeApiError: handles non-Error throws', () => {
   const { summary, detail } = describeApiError('a string was thrown');
   assertEquals(summary, 'API request failed: unknown error');
   assertEquals(detail, 'a string was thrown');
+});
+
+// ---------- callAnthropicOrFail ----------
+
+Deno.test('callAnthropicOrFail: passes through the result on success', async () => {
+  const result = await callAnthropicOrFail('input label', 'raw input', () => Promise.resolve({ ok: true }));
+  assertEquals(result, { ok: true });
+});
+
+Deno.test('callAnthropicOrFail: wraps a failure in a FailureError carrying a normalized summary, the raw input, and the original error as cause', async () => {
+  const original = apiErrorLike(429, 'Overloaded: request abc-123');
+  const err = await assertRejects(
+    () => callAnthropicOrFail('description sent', 'the raw description', () => Promise.reject(original)),
+    FailureError,
+  );
+  assertEquals(err.message, 'API request failed: HTTP 429');
+  assertEquals(err.cause, original);
+  assertEquals(err.toolFailureData !== undefined, true);
+  const input = extractToolCallInput(err.toolFailureData!);
+  assertEquals(input, 'the raw description');
+});
+
+Deno.test('callAnthropicOrFail: two failures with different message text but the same status produce the same FailureError message (stable for dedup)', async () => {
+  const a = await assertRejects(
+    () => callAnthropicOrFail('label', 'input', () => Promise.reject(apiErrorLike(529, 'Overloaded: request abc-123'))),
+    FailureError,
+  );
+  const b = await assertRejects(
+    () => callAnthropicOrFail('label', 'input', () => Promise.reject(apiErrorLike(529, 'Overloaded: request xyz-789'))),
+    FailureError,
+  );
+  assertEquals(a.message, b.message);
 });
