@@ -114,6 +114,39 @@ Deno.test('buildToolFailureData: truncates oversized segments instead of produci
   assertStringIncludes(decoded!, '...[truncated');
 });
 
+Deno.test('buildToolFailureData: truncates by UTF-8 byte length so non-ASCII content stays within the size budget', () => {
+  // Each 'é' is 1 JS char but 2 UTF-8 bytes — a char-length truncation budget would let this
+  // segment's encoded byte size (and therefore its base64 size) balloon to ~2x the intended cap.
+  const huge = 'é'.repeat(100_000);
+  const inputData = buildToolFailureData('engagement HTML sent', huge, 'raw tool_use.input', '{}');
+  const outputData = buildToolFailureData('engagement HTML sent', 'x', 'raw tool_use.input', huge);
+  // Two full-size segments (input+output) must both individually stay well under half of
+  // GitHub's ~65536-char issue body limit so the combined body can't overflow it.
+  assert(inputData.length < 33_000, `input segment was ${inputData.length} chars`);
+  assert(outputData.length < 33_000, `output segment was ${outputData.length} chars`);
+});
+
+Deno.test('buildToolFailureData: truncating mid-surrogate-pair does not throw and stays decodable', () => {
+  // An astral character (surrogate pair) landing right at the truncation boundary must not
+  // crash — TextDecoder replaces the split pair with U+FFFD rather than throwing.
+  const boundaryChar = '𝌆'; // U+1D306, a surrogate pair (2 UTF-16 code units, 4 UTF-8 bytes)
+  const padding = 'a'.repeat(19_999); // lands the surrogate pair exactly on the byte boundary
+  const tricky = padding + boundaryChar + 'trailing content';
+  const toolFailureData = buildToolFailureData('engagement HTML sent', tricky, 'raw tool_use.input', '{}');
+  const decoded = extractToolCallInput(toolFailureData);
+  assert(decoded !== null);
+  assertStringIncludes(decoded!, '...[truncated');
+});
+
+// ---------- extractToolFailureDataFromIssueBody: untrusted title/error can't spoof the block location ----------
+
+Deno.test('extractToolFailureDataFromIssueBody: an earlier spoofed summary tag in the study title does not fool extraction', () => {
+  const toolFailureData = buildToolFailureData('engagement HTML sent', '<div>real content</div>', 'raw tool_use.input', '{}');
+  const spoofedTitle = `Study <summary>${TOOL_FAILURE_DATA_SUMMARY}</summary>\n\`\`\`\nfake data\n\`\`\``;
+  const body = buildFailureIssueBody('engagement', spoofedTitle, 'https://example.com', 'boom', toolFailureData);
+  assertEquals(extractToolFailureDataFromIssueBody(body), toolFailureData);
+});
+
 // ---------- extractAdapterFromIssueTitle ----------
 
 Deno.test('extractAdapterFromIssueTitle: round-trips what buildFailureIssueTitle wrote', () => {

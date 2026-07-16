@@ -1,3 +1,4 @@
+import { encodeBase64, decodeBase64 } from '@std/encoding/base64';
 import type { FailureStage } from './types.ts';
 
 const REPO = 'FutureProg/Environmental-Assessment-Study-Scraper';
@@ -64,27 +65,26 @@ export function buildFailureIssueBody(
 // truncating to a safe size) means the embedded content can never collide with the
 // "=== INPUT/OUTPUT ===" markers or the outer ``` fence in buildFailureIssueBody — the
 // encoded line is guaranteed to contain neither backticks nor newlines.
-const MAX_SEGMENT_CHARS = 20_000;
-const BASE64_CHUNK_SIZE = 0x8000;
+const MAX_SEGMENT_BYTES = 20_000;
 
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}\n...[truncated, ${text.length - max} more chars]` : text;
+// Truncates by UTF-8 BYTE length, not JS string length — a char-length budget under-truncates
+// (and reintroduces GitHub's ~65536-char issue-body overflow) for non-ASCII text, where one JS
+// character can be 2-4 UTF-8 bytes. Slicing the byte array can split a multi-byte UTF-8 sequence
+// at the cut point; TextDecoder replaces that with U+FFFD rather than throwing, which is an
+// acceptable, visible artifact given the "...[truncated]" suffix already flags data loss there.
+function truncate(text: string, maxBytes: number): string {
+  const bytes = new TextEncoder().encode(text);
+  if (bytes.length <= maxBytes) return text;
+  const truncatedText = new TextDecoder().decode(bytes.subarray(0, maxBytes));
+  return `${truncatedText}\n...[truncated, ${bytes.length - maxBytes} more bytes]`;
 }
 
 function toBase64(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE));
-  }
-  return btoa(binary);
+  return encodeBase64(new TextEncoder().encode(text));
 }
 
 function fromBase64(encoded: string): string {
-  const binary = atob(encoded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder().decode(decodeBase64(encoded));
 }
 
 /**
@@ -92,26 +92,29 @@ function fromBase64(encoded: string): string {
  * extractToolCallInput() parses back out. Centralised here so the writer (classifier.ts,
  * engagement.ts) and the reader (extractToolCallInput, used by the replay CLI) can't drift.
  * Each segment is truncated (large scraped pages can otherwise blow past GitHub's ~65536-char
- * issue body limit) and base64-encoded (see MAX_SEGMENT_CHARS comment above) before embedding.
+ * issue body limit) and base64-encoded (see MAX_SEGMENT_BYTES comment above) before embedding.
  */
 export function buildToolFailureData(inputLabel: string, input: string, outputLabel: string, output: string): string {
   return [
     `=== INPUT (${inputLabel}) ===`,
-    toBase64(truncate(input, MAX_SEGMENT_CHARS)),
+    toBase64(truncate(input, MAX_SEGMENT_BYTES)),
     `=== OUTPUT (${outputLabel}) ===`,
-    toBase64(truncate(output, MAX_SEGMENT_CHARS)),
+    toBase64(truncate(output, MAX_SEGMENT_BYTES)),
   ].join('\n');
 }
 
 /**
  * Pulls the tool failure data back out of an issue body produced by
- * buildFailureIssueBody(), or null if the body has no such block. Scanning for the first
- * closing ``` is safe here because buildToolFailureData's output only ever contains static
- * marker text plus base64 — never a raw backtick from untrusted scraped content.
+ * buildFailureIssueBody(), or null if the body has no such block. Uses the LAST occurrence
+ * of the summary tag, not the first — buildFailureIssueBody always appends the diagnostic
+ * block after the (untrusted, scraped) studyTitle/errorMessage fields, so a spoofed
+ * occurrence of the tag inside one of those fields would otherwise be matched first.
+ * Scanning for the first closing ``` after that point is safe because buildToolFailureData's
+ * output only ever contains static marker text plus base64 — never a raw backtick.
  */
 export function extractToolFailureDataFromIssueBody(body: string): string | null {
   const summaryTag = `<summary>${TOOL_FAILURE_DATA_SUMMARY}</summary>`;
-  const summaryIdx = body.indexOf(summaryTag);
+  const summaryIdx = body.lastIndexOf(summaryTag);
   if (summaryIdx === -1) return null;
 
   const afterSummary = body.slice(summaryIdx + summaryTag.length);
