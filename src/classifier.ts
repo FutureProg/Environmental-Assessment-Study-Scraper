@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EAStudy, EAClassification } from './types.ts';
-import { describeApiError, FailureError } from './failures.ts';
+import { callAnthropicOrFail, FailureError } from './failures.ts';
 import { buildToolFailureData } from './github.ts';
 
 const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
@@ -49,9 +49,8 @@ export async function classifyStudy(study: EAStudy, opts: ClassifyOptions = {}):
     required.push('status');
   }
 
-  let response;
-  try {
-    response = await client.messages.create({
+  const response = await callAnthropicOrFail('description sent', rawDescription, () =>
+    client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 512,
       system: opts.inferStatus ? SYSTEM_PROMPT + STATUS_GUIDANCE : SYSTEM_PROMPT,
@@ -69,12 +68,7 @@ export async function classifyStudy(study: EAStudy, opts: ClassifyOptions = {}):
         role: 'user',
         content: `Classify this EA study:\nTitle: ${study.title}\nMunicipality: ${study.municipalityOwner}${descriptionSection}`,
       }],
-    });
-  } catch (err) {
-    const { summary, detail } = describeApiError(err);
-    const toolFailureData = buildToolFailureData('description sent', rawDescription, 'raw error detail', detail);
-    throw new FailureError(summary, toolFailureData);
-  }
+    }));
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {

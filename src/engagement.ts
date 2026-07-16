@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { EngagementEvent, StudyDocument, EAStudyDetail } from './types.ts';
-import { describeApiError, FailureError } from './failures.ts';
+import { callAnthropicOrFail, FailureError } from './failures.ts';
 import { buildToolFailureData } from './github.ts';
 
 const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
@@ -48,9 +48,8 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
     return { events: [], documents: Array.from(documentMap.values()) };
   }
 
-  let response;
-  try {
-    response = await client.messages.create({
+  const response = await callAnthropicOrFail('engagement HTML sent', detail.engagementHtml, () =>
+    client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
@@ -84,12 +83,7 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
         role: 'user',
         content: `Extract engagement events from this EA study page HTML:\n\n\`\`\`html\n${detail.engagementHtml}\`\`\``,
       }],
-    });
-  } catch (err) {
-    const { summary, detail: errDetail } = describeApiError(err);
-    const toolFailureData = buildToolFailureData('engagement HTML sent', detail.engagementHtml, 'raw error detail', errDetail);
-    throw new FailureError(summary, toolFailureData);
-  }
+    }));
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
