@@ -16,6 +16,22 @@ export const BROWSER_HEADERS = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Thin wrapper around fetch() that normalizes network-level failures (DNS, connection
+ * refused, TLS) to a deterministic message. The native error message for these can embed
+ * non-deterministic detail (socket/timing info), which would otherwise defeat the
+ * signature-based dedup in src/failures.ts's computeFailureSignatureKey — the same failure
+ * recurring nightly would hash differently each time and file a new issue instead of
+ * commenting on the existing one.
+ */
+async function fetchOrFail(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    throw new Error(`Failed to fetch ${url}: ${err instanceof Error ? err.constructor.name : 'unknown error'}`);
+  }
+}
+
 /** Parses an HTML string into a DOM Document, optionally with a base URL. */
 export function parseHtml(html: string, url?: string): Document {
   const options = url ? { url, pretendToBeVisual: true } : { pretendToBeVisual: true };
@@ -28,7 +44,7 @@ export function parseHtml(html: string, url?: string): Document {
  */
 export async function fetchHtml(url: string): Promise<string> {
   await sleep(1000);
-  const response = await fetch(url, { headers: BROWSER_HEADERS });
+  const response = await fetchOrFail(url, { headers: BROWSER_HEADERS });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
   return response.text();
 }
@@ -44,7 +60,7 @@ export async function fetchDocument(url: string): Promise<Document> {
  */
 export async function fetchJson(url: string): Promise<string> {
   await sleep(1000);
-  const response = await fetch(url, {
+  const response = await fetchOrFail(url, {
     headers: {
       'User-Agent': USER_AGENT,
       'Accept': 'application/json,*/*;q=0.8',
