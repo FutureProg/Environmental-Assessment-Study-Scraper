@@ -18,6 +18,15 @@ async function main() {
     Deno.exit(1);
   }
 
+  // Adapter-stage failures never have a captured payload (they're thrown by fetchStudyDetail()
+  // as plain Errors, never a FailureError with toolFailureData) — check this before the generic
+  // "no tool failure data attached" check below, which would otherwise always fire first for
+  // this stage and mask this more specific, actionable message.
+  if (stage === 'adapter') {
+    console.error('Adapter-stage failures have no captured payload to replay against — re-run the adapter live instead.');
+    Deno.exit(1);
+  }
+
   const toolFailureData = issue.body ? extractToolFailureDataFromIssueBody(issue.body) : null;
   if (toolFailureData === null) {
     console.error(`Issue #${issueNumber} has no tool failure data attached — nothing to replay.`);
@@ -59,9 +68,6 @@ async function main() {
       console.log(JSON.stringify(await classifyStudy(study, { inferStatus: matchedAdapter?.inferStatus ?? false }), null, 2));
       break;
     }
-    case 'adapter':
-      console.error('Adapter-stage failures have no captured payload to replay against — re-run the adapter live instead.');
-      Deno.exit(1);
   }
 }
 

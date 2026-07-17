@@ -1,6 +1,17 @@
 import { expect } from '@std/expect';
 import { describe, it } from '@std/testing/bdd';
-import { absolutiseHtmlHrefs, absoluteUrl } from './http.ts';
+import { absolutiseHtmlHrefs, absoluteUrl, fetchOrFail } from './http.ts';
+
+/** Stubs the global fetch for the duration of `fn`, restoring it afterward even if `fn` throws. */
+async function withStubbedFetch<T>(stub: typeof fetch, fn: () => Promise<T>): Promise<T> {
+  const original = globalThis.fetch;
+  globalThis.fetch = stub;
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = original;
+  }
+}
 
 const BASE = 'https://www.example.ca';
 
@@ -52,5 +63,55 @@ describe('absolutiseHtmlHrefs', () => {
     );
     expect(out).toContain('href="https://www.example.ca/a"');
     expect(out).toContain('href="https://cdn.example.com/b"');
+  });
+});
+
+describe('fetchOrFail', () => {
+  it('passes through the response on success', async () => {
+    const fakeResponse = new Response('ok');
+    const res = await withStubbedFetch(
+      () => Promise.resolve(fakeResponse),
+      () => fetchOrFail('https://example.com'),
+    );
+    expect(res).toBe(fakeResponse);
+  });
+
+  it('normalizes a thrown network error to a deterministic message containing the url and error constructor name', async () => {
+    await expect(
+      withStubbedFetch(
+        () => {
+          throw new TypeError('network blew up');
+        },
+        () => fetchOrFail('https://example.com'),
+      ),
+    ).rejects.toThrow('Failed to fetch https://example.com: TypeError');
+  });
+
+  it('preserves the original error via cause', async () => {
+    const original = new TypeError('dns lookup failed');
+    let caught: unknown;
+    await withStubbedFetch(
+      () => {
+        throw original;
+      },
+      () => fetchOrFail('https://example.com').catch((err) => {
+        caught = err;
+      }),
+    );
+    expect((caught as Error).cause).toBe(original);
+  });
+
+  it('two failures with different underlying messages produce the identical normalized message (stable for dedup)', async () => {
+    const messageFor = (thrown: Error) =>
+      withStubbedFetch(
+        () => {
+          throw thrown;
+        },
+        () => fetchOrFail('https://example.com'),
+      ).catch((err) => (err as Error).message);
+
+    const a = await messageFor(new TypeError('dns lookup failed for host A'));
+    const b = await messageFor(new TypeError('connection refused on host B'));
+    expect(a).toEqual(b);
   });
 });

@@ -22,13 +22,15 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * non-deterministic detail (socket/timing info), which would otherwise defeat the
  * signature-based dedup in src/failures.ts's computeFailureSignatureKey — the same failure
  * recurring nightly would hash differently each time and file a new issue instead of
- * commenting on the existing one.
+ * commenting on the existing one. The original error is preserved via `cause` so it's still
+ * recoverable by anything inspecting the thrown error, even though the message itself is
+ * normalized.
  */
-async function fetchOrFail(url: string, init?: RequestInit): Promise<Response> {
+export async function fetchOrFail(url: string, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
   } catch (err) {
-    throw new Error(`Failed to fetch ${url}: ${err instanceof Error ? err.constructor.name : 'unknown error'}`);
+    throw new Error(`Failed to fetch ${url}: ${err instanceof Error ? err.constructor.name : 'unknown error'}`, { cause: err });
   }
 }
 

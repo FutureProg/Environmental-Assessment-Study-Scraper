@@ -5,13 +5,21 @@ details belong in code comments or `docs/adr/`.
 
 ## Run failure
 
-A **run failure** is any exception thrown while processing a single study during a cron run,
+A **run failure** is any exception thrown while a cron run is working through an adapter,
 caught at one of three stages in `src/cron.ts`:
 
-- **adapter** — `fetchStudies()` / `fetchStudyDetail()` threw (e.g. a municipality's site markup changed)
+- **adapter** — `fetchStudies()` (the whole municipality's listing page) or `fetchStudyDetail()`
+  (a single study's detail page) threw (e.g. a municipality's site markup changed). A
+  `fetchStudies()` failure isn't about any one study, so it's reported with a placeholder
+  `(listing page)` study title rather than a real one — see Failure issue below.
 - **classifier** — `classifyStudy()`'s tool call returned a malformed/unexpected shape
 - **engagement** — `extractEngagementData()`'s tool call returned a malformed/unexpected shape
   (e.g. Claude called the tool with `{}`, missing the required `events` array)
+
+Only the latter two stages (and a `fetchStudyDetail()` failure) are about processing a single
+study; a `fetchStudies()` failure is per-adapter, not per-study, but is still tracked through the
+same `adapter` stage and pipeline since it's the same underlying "a municipality's site changed"
+class of problem.
 
 A run failure is distinct from "invalid data that doesn't throw" (a classification landing on
 the wrong scope, a status silently going stale) — that broader class of silent bad data is not
@@ -52,3 +60,8 @@ or the bug may already be fixed there). Done via a local CLI script that pulls t
 `<details>` block from a given issue number and re-invokes that stage's function directly. Both
 manual debugging and LLM-agent investigation use this same CLI — there is no separate agent-only
 API.
+
+`adapter`-stage issues (both the per-study `fetchStudyDetail()` case and the per-adapter
+`fetchStudies()`/listing-page case) have no captured payload to replay against — the failing
+page is never frozen into the issue, only the fact that a fetch failed — so the CLI refuses to
+replay them and points at re-running the adapter live instead.

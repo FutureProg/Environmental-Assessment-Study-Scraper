@@ -87,6 +87,11 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
 
   const toolUse = response.content.find((b) => b.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
+    // Dumped unconditionally, not just attached to the FailureError's toolFailureData — the
+    // GitHub issue that would otherwise carry this diagnostic data may never get filed (GitHub
+    // down/rate-limited, GITHUB_TOKEN unset), and this is the only guaranteed-visible copy.
+    console.debug('Engagement extractor did not return a tool_use block. Raw response content:', response.content);
+    console.debug('Engagement HTML sent:', detail.engagementHtml);
     const toolFailureData = buildToolFailureData(
       'engagement HTML sent',
       detail.engagementHtml,
@@ -99,6 +104,11 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
   const events: EngagementEvent[] = [];
   const result = toolUse.input as { events: RawItem[] };
   if (!result || !Array.isArray(result.events)) {
+    // See the comment above the sibling throw — always dumped, regardless of whether
+    // reportFailure later succeeds in attaching this same data to a GitHub issue.
+    console.debug('Engagement extractor returned invalid data. Raw response content:', response.content);
+    console.debug('Engagement HTML sent:', detail.engagementHtml);
+    console.debug('Unexpected engagement extractor output:', toolUse.input);
     const toolFailureData = buildToolFailureData(
       'engagement HTML sent',
       detail.engagementHtml,

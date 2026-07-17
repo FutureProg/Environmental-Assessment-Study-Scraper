@@ -64,7 +64,12 @@ export async function computeFailureSignatureKey(
   studyTitle: string,
   errorMessage: string,
 ): Promise<string> {
-  return await sha256Hex(`${stage}|${adapter}|${studyTitle}|${errorMessage}`);
+  // JSON-encode each field rather than joining with a plain delimiter (e.g. '|') — a scraped
+  // study title or error message can legitimately contain the delimiter character, which would
+  // shift field boundaries and let two unrelated failures collide onto the same signature.
+  // JSON.stringify escapes quotes/backslashes/control characters, so the array serialises to a
+  // form each field can be recovered from unambiguously.
+  return await sha256Hex(JSON.stringify([stage, adapter, studyTitle, errorMessage]));
 }
 
 let _kv: Deno.Kv | null = null;
@@ -88,6 +93,48 @@ export interface ReportFailureParams {
   toolFailureData?: string;
 }
 
+/**
+ * Files a new GitHub issue for a first-seen failure signature. Never throws — GitHub being
+ * down/rate-limited, or GITHUB_TOKEN being unset, must not prevent the KV record (the last
+ * line of failure visibility, per the ADR) from being written.
+ */
+async function tryFileGithubIssue(
+  stage: FailureStage,
+  study: ReportFailureParams['study'],
+  errorMessage: string,
+  toolFailureData: string | undefined,
+): Promise<number | null> {
+  try {
+    await ensureLabelsExist();
+    const title = buildFailureIssueTitle(stage, study.municipalityOwner, study.title);
+    const body = buildFailureIssueBody(stage, study.title, study.sourceUrl, errorMessage, toolFailureData);
+    const issue = await createGithubIssue(title, body, [SCRAPER_FAILURE_LABEL, stageLabel(stage)]);
+    return issue.number;
+  } catch (err) {
+    console.error('Failed to file a GitHub issue for a run failure; keeping the KV record without one:', err);
+    return null;
+  }
+}
+
+/**
+ * Comments on (or reopens-and-comments on) the GitHub issue linked to a recurring failure.
+ * Never throws, for the same reason as tryFileGithubIssue — a GitHub-side failure here must
+ * not stop the KV occurrence count/lastSeenAt from being updated.
+ */
+async function tryUpdateGithubIssue(issueNumber: number, occurrenceCount: number, now: string): Promise<void> {
+  try {
+    const issue = await getGithubIssue(issueNumber);
+    if (issue.state === 'open') {
+      await commentOnGithubIssue(issueNumber, buildRecurrenceComment(occurrenceCount, now));
+    } else {
+      await reopenGithubIssue(issueNumber);
+      await commentOnGithubIssue(issueNumber, buildRegressionComment(occurrenceCount, now));
+    }
+  } catch (err) {
+    console.error(`Failed to update GitHub issue #${issueNumber} for a recurring failure; KV record is still updated:`, err);
+  }
+}
+
 export async function reportFailure(params: ReportFailureParams): Promise<void> {
   try {
     const { stage, study, error } = params;
@@ -101,11 +148,7 @@ export async function reportFailure(params: ReportFailureParams): Promise<void> 
     const existing = await kv.get<FailureRecord>(key);
 
     if (!existing.value) {
-      await ensureLabelsExist();
-      const title = buildFailureIssueTitle(stage, study.municipalityOwner, study.title);
-      const body = buildFailureIssueBody(stage, study.title, study.sourceUrl, error.message, toolFailureData);
-      const issue = await createGithubIssue(title, body, [SCRAPER_FAILURE_LABEL, stageLabel(stage)]);
-
+      const githubIssueNumber = await tryFileGithubIssue(stage, study, error.message, toolFailureData);
       const record: FailureRecord = {
         stage,
         municipalityOwner: study.municipalityOwner,
@@ -115,7 +158,7 @@ export async function reportFailure(params: ReportFailureParams): Promise<void> 
         firstSeenAt: now,
         lastSeenAt: now,
         occurrenceCount: 1,
-        githubIssueNumber: issue.number,
+        githubIssueNumber,
       };
       await kv.set(key, record, { expireIn: THIRTY_DAYS_MS });
       return;
@@ -123,16 +166,17 @@ export async function reportFailure(params: ReportFailureParams): Promise<void> 
 
     const record = existing.value;
     const occurrenceCount = record.occurrenceCount + 1;
-    const issue = await getGithubIssue(record.githubIssueNumber);
 
-    if (issue.state === 'open') {
-      await commentOnGithubIssue(record.githubIssueNumber, buildRecurrenceComment(occurrenceCount, now));
+    // A prior occurrence never got an issue filed (GitHub was down/misconfigured at the time) —
+    // retry filing it now rather than assuming one already exists.
+    let githubIssueNumber = record.githubIssueNumber;
+    if (githubIssueNumber === null) {
+      githubIssueNumber = await tryFileGithubIssue(stage, study, error.message, toolFailureData);
     } else {
-      await reopenGithubIssue(record.githubIssueNumber);
-      await commentOnGithubIssue(record.githubIssueNumber, buildRegressionComment(occurrenceCount, now));
+      await tryUpdateGithubIssue(githubIssueNumber, occurrenceCount, now);
     }
 
-    await kv.set(key, { ...record, lastSeenAt: now, occurrenceCount }, { expireIn: THIRTY_DAYS_MS });
+    await kv.set(key, { ...record, lastSeenAt: now, occurrenceCount, githubIssueNumber }, { expireIn: THIRTY_DAYS_MS });
   } catch (reportingError) {
     // Failure reporting must never crash the cron run it's reporting on.
     console.error('reportFailure itself failed:', reportingError);

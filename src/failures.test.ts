@@ -26,6 +26,14 @@ Deno.test('computeFailureSignatureKey: differs by study title', async () => {
   assertNotEquals(a, b);
 });
 
+Deno.test("computeFailureSignatureKey: a delimiter character in one field can't shift into another field and collide", async () => {
+  // A naive '|'-joined signature would hash 'engagement|adapter|A|B|C' for both of these,
+  // even though they're two different (title, error) pairs.
+  const a = await computeFailureSignatureKey('engagement', 'adapter', 'A|B', 'C');
+  const b = await computeFailureSignatureKey('engagement', 'adapter', 'A', 'B|C');
+  assertNotEquals(a, b);
+});
+
 Deno.test('computeFailureSignatureKey: differs by error message', async () => {
   const a = await computeFailureSignatureKey('engagement', 'Town of Oakville', 'Kerr St Study', 'boom');
   const b = await computeFailureSignatureKey('engagement', 'Town of Oakville', 'Kerr St Study', 'crash');

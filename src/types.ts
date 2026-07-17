@@ -73,7 +73,10 @@ export interface FailureRecord {
   firstSeenAt: string;   // ISO
   lastSeenAt: string;    // ISO
   occurrenceCount: number;
-  githubIssueNumber: number;
+  // null when the GitHub issue could not be filed (e.g. GITHUB_TOKEN unset, GitHub API
+  // down/rate-limited) — the record still exists so the failure isn't invisible, and a later
+  // occurrence retries filing the issue.
+  githubIssueNumber: number | null;
 }
 
 export interface AssessmentDiff {
