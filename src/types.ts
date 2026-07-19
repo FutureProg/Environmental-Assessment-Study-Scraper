@@ -62,6 +62,23 @@ export interface Adapter {
   fetchStudyDetail(sourceUrl: string): Promise<EAStudyDetail>;
 }
 
+export type FailureStage = 'adapter' | 'classifier' | 'engagement';
+
+export interface FailureRecord {
+  stage: FailureStage;
+  municipalityOwner: string;
+  studyTitle: string;
+  sourceUrl: string;
+  errorMessage: string;
+  firstSeenAt: string;   // ISO
+  lastSeenAt: string;    // ISO
+  occurrenceCount: number;
+  // null when the GitHub issue could not be filed (e.g. GITHUB_TOKEN unset, GitHub API
+  // down/rate-limited) — the record still exists so the failure isn't invisible, and a later
+  // occurrence retries filing the issue.
+  githubIssueNumber: number | null;
+}
+
 export interface AssessmentDiff {
   id: number;
   municipalities: string[];
