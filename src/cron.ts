@@ -23,7 +23,11 @@ export async function cronHandler() {
     }
   }
 
-  await sendEngagementSummary(summaryItems);
+  try {
+    await sendEngagementSummary(summaryItems);
+  } catch (err) {
+    console.error('engagement summary failed:', err);
+  }
 
   await closeDb();
   closeKv();
