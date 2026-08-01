@@ -1,5 +1,6 @@
 import type { EAStudy, FailureRecord, FailureStage } from './types.ts';
 import { sha256Hex } from './adapters/http.ts';
+import { getKv } from './kv.ts';
 import {
   buildFailureIssueBody,
   buildFailureIssueTitle,
@@ -70,20 +71,6 @@ export async function computeFailureSignatureKey(
   // JSON.stringify escapes quotes/backslashes/control characters, so the array serialises to a
   // form each field can be recovered from unambiguously.
   return await sha256Hex(JSON.stringify([stage, adapter, studyTitle, errorMessage]));
-}
-
-let _kv: Deno.Kv | null = null;
-
-export async function getKv(): Promise<Deno.Kv> {
-  if (!_kv) {
-    _kv = await Deno.openKv();
-  }
-  return _kv;
-}
-
-export function closeKv(): void {
-  _kv?.close();
-  _kv = null;
 }
 
 export interface ReportFailureParams {

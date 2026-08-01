@@ -1,4 +1,4 @@
-import { getKv } from './failures.ts';
+import { getKv } from './kv.ts';
 import type { AssessmentDiff, EngagementEvent, StudyDocument } from './types.ts';
 
 // Embeds are persisted here as they're built during a run and only removed once a send

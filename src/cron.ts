@@ -4,7 +4,8 @@ import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
 import { buildDiscordEmbeds, flushQueuedDiscordEmbeds, queueDiscordEmbed, sendEngagementSummary } from './discord.ts';
 import type { EngagementSummaryItem } from './discord.ts';
-import { closeKv, reportAndRethrow, reportFailure } from './failures.ts';
+import { reportAndRethrow, reportFailure } from './failures.ts';
+import { closeKv } from './kv.ts';
 import type { Adapter, EAClassification, EAStudy } from './types.ts';
 
 export async function cronHandler() {
