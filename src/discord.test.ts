@@ -259,6 +259,7 @@ Deno.test('embed d: new documents (on_going) -> purple', () => {
   const purple = r.embeds.find((e) => e.color === 0x9b59b6);
   assert(purple, 'expected purple documents embed');
   assertEquals(purple!.title, 'NEW: Documents Published for Test Study');
+  assertEquals(r.shouldMentionRole, true);
 });
 
 Deno.test('embed d: documents on newly-completed study -> purple shown', () => {
@@ -273,6 +274,7 @@ Deno.test('embed d: documents on newly-completed study -> purple shown', () => {
     [doc()],
   );
   assert(r.embeds.some((e) => e.color === 0x9b59b6));
+  assertEquals(r.shouldMentionRole, true);
 });
 
 Deno.test('embed d: empty documents -> no purple embed', () => {
