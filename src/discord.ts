@@ -137,7 +137,7 @@ export function buildDiscordEmbeds(
 }
 
 /**
- * Sends every queued study embed as a batch of messages at the end of a run, instead of
+ * Sends a batch of queued study embeds in one or more chunked webhook calls, instead of
  * trickling one webhook call out per study as it's processed. Never mentions the
  * notification role — that happens once, separately, via `sendEngagementSummary`.
  *
