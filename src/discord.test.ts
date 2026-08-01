@@ -274,6 +274,7 @@ Deno.test('embed d: documents on newly-completed study -> purple shown', () => {
     [doc()],
   );
   assert(r.embeds.some((e) => e.color === 0x9b59b6));
+  assertEquals(r.shouldMentionRole, true);
 });
 
 Deno.test('embed d: empty documents -> no purple embed', () => {
