@@ -2,14 +2,17 @@ import { adapters } from './adapters/index.ts';
 import { classifyStudy } from './classifier.ts';
 import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
-import { sendDiscordChanges } from './discord.ts';
+import { sendDiscordChanges, sendEngagementSummary } from './discord.ts';
+import type { EngagementSummaryItem } from './discord.ts';
 import { closeKv, reportAndRethrow, reportFailure } from './failures.ts';
 import type { Adapter, EAClassification, EAStudy } from './types.ts';
 
 export async function cronHandler() {
+  const summaryItems: EngagementSummaryItem[] = [];
+
   for (const adapter of adapters) {
     try {
-      await runAdapter(adapter);
+      await runAdapter(adapter, summaryItems);
     } catch (err) {
       console.error(`[${adapter.municipalityOwner}] adapter failed:`, err);
       await reportFailure({
@@ -20,26 +23,28 @@ export async function cronHandler() {
     }
   }
 
+  await sendEngagementSummary(summaryItems);
+
   await closeDb();
   closeKv();
   console.log('Done');
 }
 
-async function runAdapter(adapter: Adapter) {
+async function runAdapter(adapter: Adapter, summaryItems: EngagementSummaryItem[]) {
   const studies = await adapter.fetchStudies();
   console.log(`[${adapter.municipalityOwner}] Found ${studies.length} studies`);
 
   for (const study of studies) {
     // Isolate failures per study so one bad detail page doesn't skip the rest of the batch.
     try {
-      await processStudy(adapter, study);
+      await processStudy(adapter, study, summaryItems);
     } catch (err) {
       console.error(`  [${study.title}] failed, skipping:`, err);
     }
   }
 }
 
-async function processStudy(adapter: Adapter, study: EAStudy) {
+async function processStudy(adapter: Adapter, study: EAStudy, summaryItems: EngagementSummaryItem[]) {
   try {
     study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
   } catch (err) {
@@ -110,5 +115,8 @@ async function processStudy(adapter: Adapter, study: EAStudy) {
     }
   }
 
-  await sendDiscordChanges(diff, newEvents, newDocuments);
+  const { shouldMentionRole } = await sendDiscordChanges(diff, newEvents, newDocuments);
+  if (shouldMentionRole) {
+    summaryItems.push({ title: diff.title, sourceUrl: diff.sourceUrl, municipalities: diff.municipalities });
+  }
 }

@@ -16,6 +16,24 @@ export interface DiscordEmbed {
   fields?: { name: string; value: string; inline?: boolean }[];
 }
 
+export interface EngagementSummaryItem {
+  title: string;
+  sourceUrl: string;
+  municipalities: string[];
+}
+
+// Custom emoji placed at the start of each municipality heading in the run summary.
+const MUNICIPALITY_EMOJI: Record<string, string> = {
+  'Oakville':      '<:oakville:1053337529895632976>',
+  'Milton':        '<:milton:1053337075803504670>',
+  'Burlington':    '<:burlington:1053336420963602488>',
+  'Halton Hills':  '<:halton_hills:1053345698994737262>',
+  'Halton Region': '<:halton_region:1053347683424808962>',
+};
+
+// Known municipalities are listed first, in this order; anything else is sorted after.
+const MUNICIPALITY_ORDER = Object.keys(MUNICIPALITY_EMOJI);
+
 /**
  * Decides which Discord embeds (if any) should be posted for an assessment change,
  * and whether the notification role should be mentioned. Pure — no network or env.
@@ -117,24 +135,25 @@ export function buildDiscordEmbeds(
   return { embeds, shouldMentionRole };
 }
 
+/**
+ * Posts the per-study embeds for an assessment change. Never mentions the notification
+ * role — that happens once, at the end of a run, via `sendEngagementSummary`.
+ *
+ * Returns `shouldMentionRole` so the caller can accumulate this study into that summary.
+ */
 export async function sendDiscordChanges(
   diff: AssessmentDiff,
   newEngagementEvents: EngagementEvent[],
   newDocuments: StudyDocument[],
-): Promise<void> {
-  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
-  if (!webhookUrl) return;
-
+): Promise<{ shouldMentionRole: boolean }> {
   const { embeds, shouldMentionRole } = buildDiscordEmbeds(diff, newEngagementEvents, newDocuments);
-  if (embeds.length === 0) return;
 
-  const roleId = Deno.env.get('DISCORD_NOTIFICATION_ROLE_ID');
-  const mention = shouldMentionRole && roleId ? `<@&${roleId}>` : undefined;
+  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
+  if (!webhookUrl || embeds.length === 0) return { shouldMentionRole };
 
   // Discord allows max 10 embeds per message; split if needed
   for (let i = 0; i < embeds.length; i += 10) {
     const payload: Record<string, unknown> = { embeds: embeds.slice(i, i + 10) };
-    if (i === 0 && mention) payload.content = mention;
     const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,6 +162,73 @@ export async function sendDiscordChanges(
     if (!res.ok) {
       console.error(`Discord webhook failed: ${res.status} ${await res.text()}`);
     }
+  }
+
+  return { shouldMentionRole };
+}
+
+/**
+ * Builds the single end-of-run summary embed listing every notification-worthy study,
+ * grouped under a heading per municipality (a study covering multiple municipalities
+ * appears under each). Pure — no network. Returns null when there's nothing to summarise.
+ */
+export function buildEngagementSummaryEmbed(items: EngagementSummaryItem[]): DiscordEmbed | null {
+  if (items.length === 0) return null;
+
+  const byMunicipality = new Map<string, Set<string>>();
+  for (const item of items) {
+    const areas = item.municipalities.length > 0 ? item.municipalities : ['Other'];
+    const line = `• [${item.title}](${item.sourceUrl})`;
+    for (const area of areas) {
+      if (!byMunicipality.has(area)) byMunicipality.set(area, new Set());
+      byMunicipality.get(area)!.add(line);
+    }
+  }
+
+  const orderedKeys = [
+    ...MUNICIPALITY_ORDER.filter((m) => byMunicipality.has(m)),
+    ...[...byMunicipality.keys()].filter((m) => !MUNICIPALITY_ORDER.includes(m)).sort(),
+  ];
+
+  const fields = orderedKeys.map((municipality) => {
+    const emoji = MUNICIPALITY_EMOJI[municipality];
+    return {
+      name: emoji ? `${emoji} ${municipality}` : municipality,
+      value: [...byMunicipality.get(municipality)!].join('\n'),
+      inline: false,
+    };
+  });
+
+  return {
+    title: 'Engagement Summary',
+    color: COLORS.orange,
+    fields,
+  };
+}
+
+/**
+ * Sends the single end-of-run summary notification (with the role mention) listing
+ * every notification-worthy study from the run, grouped by municipality. No-ops when
+ * there's nothing to summarise or the webhook isn't configured.
+ */
+export async function sendEngagementSummary(items: EngagementSummaryItem[]): Promise<void> {
+  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
+  if (!webhookUrl) return;
+
+  const embed = buildEngagementSummaryEmbed(items);
+  if (!embed) return;
+
+  const roleId = Deno.env.get('DISCORD_NOTIFICATION_ROLE_ID');
+  const payload: Record<string, unknown> = { embeds: [embed] };
+  if (roleId) payload.content = `<@&${roleId}>`;
+
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    console.error(`Discord webhook failed: ${res.status} ${await res.text()}`);
   }
 }
 

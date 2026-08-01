@@ -1,5 +1,5 @@
 import { assert, assertEquals } from '@std/assert';
-import { buildDiscordEmbeds } from './discord.ts';
+import { buildDiscordEmbeds, buildEngagementSummaryEmbed } from './discord.ts';
 import type {
   AssessmentDiff,
   EngagementEvent,
@@ -297,6 +297,57 @@ Deno.test('not relevant -> engagement/documents produce nothing', () => {
   );
   // not relevant and not new -> fully suppressed
   assertEquals(r.embeds, []);
+});
+
+// ---------- engagement summary embed ----------
+
+Deno.test('summary: empty items -> null', () => {
+  assertEquals(buildEngagementSummaryEmbed([]), null);
+});
+
+Deno.test('summary: groups items by municipality with emoji headings, known order first', () => {
+  const embed = buildEngagementSummaryEmbed([
+    { title: 'Burlington Study', sourceUrl: 'https://example.com/b', municipalities: ['Burlington'] },
+    { title: 'Oakville Study', sourceUrl: 'https://example.com/o', municipalities: ['Oakville'] },
+    { title: 'Region Study', sourceUrl: 'https://example.com/r', municipalities: ['Halton Region'] },
+  ]);
+  assert(embed);
+  assertEquals(embed!.fields!.map((f) => f.name), [
+    '<:oakville:1053337529895632976> Oakville',
+    '<:burlington:1053336420963602488> Burlington',
+    '<:halton_region:1053347683424808962> Halton Region',
+  ]);
+  assertEquals(embed!.fields![0].value, '• [Oakville Study](https://example.com/o)');
+});
+
+Deno.test('summary: study covering multiple municipalities appears under each heading', () => {
+  const embed = buildEngagementSummaryEmbed([
+    { title: 'Shared Study', sourceUrl: 'https://example.com/s', municipalities: ['Oakville', 'Milton'] },
+  ]);
+  assert(embed);
+  const names = embed!.fields!.map((f) => f.name);
+  assert(names.includes('<:oakville:1053337529895632976> Oakville'));
+  assert(names.includes('<:milton:1053337075803504670> Milton'));
+});
+
+Deno.test('summary: unknown municipality gets no emoji, sorted after known ones', () => {
+  const embed = buildEngagementSummaryEmbed([
+    { title: 'Mystery Study', sourceUrl: 'https://example.com/m', municipalities: ['Nowhereville'] },
+    { title: 'Oakville Study', sourceUrl: 'https://example.com/o', municipalities: ['Oakville'] },
+  ]);
+  assert(embed);
+  assertEquals(embed!.fields!.map((f) => f.name), [
+    '<:oakville:1053337529895632976> Oakville',
+    'Nowhereville',
+  ]);
+});
+
+Deno.test('summary: no municipalities falls back to "Other" heading', () => {
+  const embed = buildEngagementSummaryEmbed([
+    { title: 'Orphan Study', sourceUrl: 'https://example.com/x', municipalities: [] },
+  ]);
+  assert(embed);
+  assertEquals(embed!.fields!.map((f) => f.name), ['Other']);
 });
 
 Deno.test('embed ordering: new+status+scope+events+docs', () => {
