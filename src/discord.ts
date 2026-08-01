@@ -137,20 +137,15 @@ export function buildDiscordEmbeds(
 }
 
 /**
- * Posts the per-study embeds for an assessment change. Never mentions the notification
- * role — that happens once, at the end of a run, via `sendEngagementSummary`.
+ * Sends every queued study embed as a batch of messages at the end of a run, instead of
+ * trickling one webhook call out per study as it's processed. Never mentions the
+ * notification role — that happens once, separately, via `sendEngagementSummary`.
  *
- * Returns `shouldMentionRole` so the caller can accumulate this study into that summary.
+ * No-ops when there's nothing queued or the webhook isn't configured.
  */
-export async function sendDiscordChanges(
-  diff: AssessmentDiff,
-  newEngagementEvents: EngagementEvent[],
-  newDocuments: StudyDocument[],
-): Promise<{ shouldMentionRole: boolean }> {
-  const { embeds, shouldMentionRole } = buildDiscordEmbeds(diff, newEngagementEvents, newDocuments);
-
+export async function sendDiscordEmbeds(embeds: DiscordEmbed[]): Promise<void> {
   const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
-  if (!webhookUrl || embeds.length === 0) return { shouldMentionRole };
+  if (!webhookUrl || embeds.length === 0) return;
 
   // Discord allows max 10 embeds per message; split if needed
   for (let i = 0; i < embeds.length; i += 10) {
@@ -164,8 +159,6 @@ export async function sendDiscordChanges(
       console.error(`Discord webhook failed: ${res.status} ${await res.text()}`);
     }
   }
-
-  return { shouldMentionRole };
 }
 
 /**
