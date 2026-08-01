@@ -117,6 +117,7 @@ export function buildDiscordEmbeds(
     }
 
     if (newDocuments.length > 0 && (diff.status !== 'completed' || isNewlyCompleted)) {
+      shouldMentionRole = true;
       const docList = newDocuments
         .map((d) => d.publishedLabel ? `[${d.title}](${d.url}) — ${d.publishedLabel}` : `[${d.title}](${d.url})`)
         .join('\n');
