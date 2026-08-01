@@ -2,9 +2,10 @@ import { adapters } from './adapters/index.ts';
 import { classifyStudy } from './classifier.ts';
 import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
-import { sendDiscordChanges, sendEngagementSummary } from './discord.ts';
+import { buildDiscordEmbeds, flushQueuedDiscordEmbeds, queueDiscordEmbed, sendEngagementSummary } from './discord.ts';
 import type { EngagementSummaryItem } from './discord.ts';
-import { closeKv, reportAndRethrow, reportFailure } from './failures.ts';
+import { reportAndRethrow, reportFailure } from './failures.ts';
+import { closeKv } from './kv.ts';
 import type { Adapter, EAClassification, EAStudy } from './types.ts';
 
 export async function cronHandler() {
@@ -21,6 +22,15 @@ export async function cronHandler() {
         error: err instanceof Error ? err : new Error(String(err)),
       });
     }
+  }
+
+  // Embeds were durably queued (Deno KV) as each study was processed, so this single
+  // end-of-run flush also picks up anything a previous run's crash left behind — no need to
+  // shrink the flush window to bound crash blast radius.
+  try {
+    await flushQueuedDiscordEmbeds();
+  } catch (err) {
+    console.error('discord batch send failed:', err);
   }
 
   try {
@@ -119,7 +129,10 @@ async function processStudy(adapter: Adapter, study: EAStudy, summaryItems: Enga
     }
   }
 
-  const { shouldMentionRole } = await sendDiscordChanges(diff, newEvents, newDocuments);
+  const { embeds, shouldMentionRole } = buildDiscordEmbeds(diff, newEvents, newDocuments);
+  for (const embed of embeds) {
+    await queueDiscordEmbed(embed);
+  }
   if (shouldMentionRole) {
     summaryItems.push({ title: diff.title, sourceUrl: diff.sourceUrl, municipalities: diff.municipalities });
   }

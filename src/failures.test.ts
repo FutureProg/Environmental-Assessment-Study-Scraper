@@ -1,6 +1,7 @@
 import { assertEquals, assertNotEquals, assertRejects } from '@std/assert';
-import { callAnthropicOrFail, closeKv, computeFailureSignatureKey, describeApiError, FailureError, reportFailure } from './failures.ts';
+import { callAnthropicOrFail, computeFailureSignatureKey, describeApiError, FailureError, reportFailure } from './failures.ts';
 import { extractToolCallInput } from './github.ts';
+import { closeKv } from './kv.ts';
 import type { FailureRecord } from './types.ts';
 
 Deno.test('computeFailureSignatureKey: stable for identical inputs', async () => {
