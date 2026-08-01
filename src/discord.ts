@@ -1,4 +1,11 @@
+import { getKv } from './failures.ts';
 import type { AssessmentDiff, EngagementEvent, StudyDocument } from './types.ts';
+
+// Embeds are persisted here as they're built during a run and only removed once a send
+// attempt has been made — if the process crashes mid-run, they survive to be sent (mixed in
+// with the next run's own embeds) by that run's end-of-run flush.
+const QUEUE_PREFIX = ['discord_embed_queue'];
+const QUEUE_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const COLORS = {
   green:  0x2ecc71,
@@ -137,17 +144,48 @@ export function buildDiscordEmbeds(
 }
 
 /**
- * Sends a batch of queued study embeds in one or more chunked webhook calls, instead of
- * trickling one webhook call out per study as it's processed. Never mentions the
- * notification role — that happens once, separately, via `sendEngagementSummary`.
- *
- * No-ops when there's nothing queued or the webhook isn't configured.
+ * Durably persists a single study embed to be sent by the next `flushQueuedDiscordEmbeds`
+ * call, so it survives a mid-run crash instead of being lost. Called once per study as it's
+ * processed, in place of posting to the webhook immediately.
  */
-export async function sendDiscordEmbeds(embeds: DiscordEmbed[]): Promise<void> {
-  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
-  if (!webhookUrl || embeds.length === 0) return;
+export async function queueDiscordEmbed(embed: DiscordEmbed): Promise<void> {
+  const kv = await getKv();
+  const key = [...QUEUE_PREFIX, Date.now(), crypto.randomUUID()];
+  await kv.set(key, embed, { expireIn: QUEUE_ENTRY_TTL_MS });
+}
 
-  // Discord allows max 10 embeds per message; split if needed
+/**
+ * Sends every embed queued via `queueDiscordEmbed` — from this run and, if the previous run
+ * crashed before flushing, any it left behind — as a single batch of chunked webhook calls,
+ * once at the end of a run. Never mentions the notification role — that happens once,
+ * separately, via `sendEngagementSummary`.
+ *
+ * No-ops when there's nothing queued. Entries are removed once a send attempt has been made,
+ * whether or not it succeeded, matching the rest of this module's best-effort delivery.
+ */
+export async function flushQueuedDiscordEmbeds(): Promise<void> {
+  const kv = await getKv();
+  const entries: { key: Deno.KvKey; embed: DiscordEmbed }[] = [];
+  for await (const entry of kv.list<DiscordEmbed>({ prefix: QUEUE_PREFIX })) {
+    entries.push({ key: entry.key, embed: entry.value });
+  }
+  if (entries.length === 0) return;
+
+  await sendDiscordEmbeds(entries.map((e) => e.embed));
+
+  for (const { key } of entries) {
+    await kv.delete(key);
+  }
+}
+
+/**
+ * Posts a batch of embeds in one or more chunked webhook calls (Discord allows max 10 embeds
+ * per message). No-ops when the webhook isn't configured.
+ */
+async function sendDiscordEmbeds(embeds: DiscordEmbed[]): Promise<void> {
+  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
+  if (!webhookUrl) return;
+
   for (let i = 0; i < embeds.length; i += 10) {
     const payload: Record<string, unknown> = { embeds: embeds.slice(i, i + 10) };
     const res = await fetch(webhookUrl, {

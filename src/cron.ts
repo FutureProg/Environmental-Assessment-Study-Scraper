@@ -2,18 +2,17 @@ import { adapters } from './adapters/index.ts';
 import { classifyStudy } from './classifier.ts';
 import { extractEngagementData } from './engagement.ts';
 import { upsertAssessment, getStoredAssessment, syncEngagementEvents, syncDocuments, closeDb } from './db.ts';
-import { buildDiscordEmbeds, sendDiscordEmbeds, sendEngagementSummary } from './discord.ts';
-import type { DiscordEmbed, EngagementSummaryItem } from './discord.ts';
+import { buildDiscordEmbeds, flushQueuedDiscordEmbeds, queueDiscordEmbed, sendEngagementSummary } from './discord.ts';
+import type { EngagementSummaryItem } from './discord.ts';
 import { closeKv, reportAndRethrow, reportFailure } from './failures.ts';
 import type { Adapter, EAClassification, EAStudy } from './types.ts';
 
 export async function cronHandler() {
   const summaryItems: EngagementSummaryItem[] = [];
-  const embedQueue: DiscordEmbed[] = [];
 
   for (const adapter of adapters) {
     try {
-      await runAdapter(adapter, summaryItems, embedQueue);
+      await runAdapter(adapter, summaryItems);
     } catch (err) {
       console.error(`[${adapter.municipalityOwner}] adapter failed:`, err);
       await reportFailure({
@@ -22,14 +21,15 @@ export async function cronHandler() {
         error: err instanceof Error ? err : new Error(String(err)),
       });
     }
+  }
 
-    // Flush per adapter (rather than once at the very end) so a mid-run crash on a later
-    // adapter doesn't lose notifications for studies already persisted by earlier adapters.
-    try {
-      await sendDiscordEmbeds(embedQueue.splice(0));
-    } catch (err) {
-      console.error(`[${adapter.municipalityOwner}] discord batch send failed:`, err);
-    }
+  // Embeds were durably queued (Deno KV) as each study was processed, so this single
+  // end-of-run flush also picks up anything a previous run's crash left behind — no need to
+  // shrink the flush window to bound crash blast radius.
+  try {
+    await flushQueuedDiscordEmbeds();
+  } catch (err) {
+    console.error('discord batch send failed:', err);
   }
 
   try {
@@ -43,21 +43,21 @@ export async function cronHandler() {
   console.log('Done');
 }
 
-async function runAdapter(adapter: Adapter, summaryItems: EngagementSummaryItem[], embedQueue: DiscordEmbed[]) {
+async function runAdapter(adapter: Adapter, summaryItems: EngagementSummaryItem[]) {
   const studies = await adapter.fetchStudies();
   console.log(`[${adapter.municipalityOwner}] Found ${studies.length} studies`);
 
   for (const study of studies) {
     // Isolate failures per study so one bad detail page doesn't skip the rest of the batch.
     try {
-      await processStudy(adapter, study, summaryItems, embedQueue);
+      await processStudy(adapter, study, summaryItems);
     } catch (err) {
       console.error(`  [${study.title}] failed, skipping:`, err);
     }
   }
 }
 
-async function processStudy(adapter: Adapter, study: EAStudy, summaryItems: EngagementSummaryItem[], embedQueue: DiscordEmbed[]) {
+async function processStudy(adapter: Adapter, study: EAStudy, summaryItems: EngagementSummaryItem[]) {
   try {
     study.detail = await adapter.fetchStudyDetail(study.sourceUrl);
   } catch (err) {
@@ -129,7 +129,9 @@ async function processStudy(adapter: Adapter, study: EAStudy, summaryItems: Enga
   }
 
   const { embeds, shouldMentionRole } = buildDiscordEmbeds(diff, newEvents, newDocuments);
-  embedQueue.push(...embeds);
+  for (const embed of embeds) {
+    await queueDiscordEmbed(embed);
+  }
   if (shouldMentionRole) {
     summaryItems.push({ title: diff.title, sourceUrl: diff.sourceUrl, municipalities: diff.municipalities });
   }
