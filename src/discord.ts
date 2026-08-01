@@ -156,12 +156,13 @@ export async function queueDiscordEmbed(embed: DiscordEmbed): Promise<void> {
 
 /**
  * Sends every embed queued via `queueDiscordEmbed` — from this run and, if the previous run
- * crashed before flushing, any it left behind — as a single batch of chunked webhook calls,
- * once at the end of a run. Never mentions the notification role — that happens once,
- * separately, via `sendEngagementSummary`.
+ * crashed before flushing, any it left behind — as a batch of chunked webhook calls, once at
+ * the end of a run. Never mentions the notification role — that happens once, separately, via
+ * `sendEngagementSummary`.
  *
- * No-ops when there's nothing queued. Entries are removed once a send attempt has been made,
- * whether or not it succeeded, matching the rest of this module's best-effort delivery.
+ * No-ops when there's nothing queued. Each chunk's entries are removed right after that
+ * chunk's send attempt (success, non-2xx response, or thrown request error), so a later
+ * chunk failing can't cause an earlier, already-delivered chunk to be resent on the next flush.
  */
 export async function flushQueuedDiscordEmbeds(): Promise<void> {
   const kv = await getKv();
@@ -171,31 +172,37 @@ export async function flushQueuedDiscordEmbeds(): Promise<void> {
   }
   if (entries.length === 0) return;
 
-  await sendDiscordEmbeds(entries.map((e) => e.embed));
+  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
 
-  for (const { key } of entries) {
-    await kv.delete(key);
+  // Discord allows max 10 embeds per message; send and clear one chunk at a time.
+  for (let i = 0; i < entries.length; i += 10) {
+    const chunk = entries.slice(i, i + 10);
+    if (webhookUrl) {
+      await sendDiscordEmbedChunk(webhookUrl, chunk.map((e) => e.embed));
+    }
+    for (const { key } of chunk) {
+      await kv.delete(key);
+    }
   }
 }
 
 /**
- * Posts a batch of embeds in one or more chunked webhook calls (Discord allows max 10 embeds
- * per message). No-ops when the webhook isn't configured.
+ * Posts a single chunk (max 10) of embeds to the webhook. Never throws — a failed request
+ * (non-2xx response or a thrown network error) is logged and swallowed so the caller can
+ * still clear this chunk's queue entries and move on to the next chunk.
  */
-async function sendDiscordEmbeds(embeds: DiscordEmbed[]): Promise<void> {
-  const webhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL');
-  if (!webhookUrl) return;
-
-  for (let i = 0; i < embeds.length; i += 10) {
-    const payload: Record<string, unknown> = { embeds: embeds.slice(i, i + 10) };
+async function sendDiscordEmbedChunk(webhookUrl: string, embeds: DiscordEmbed[]): Promise<void> {
+  try {
     const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ embeds }),
     });
     if (!res.ok) {
       console.error(`Discord webhook failed: ${res.status} ${await res.text()}`);
     }
+  } catch (err) {
+    console.error('Discord webhook request failed:', err);
   }
 }
 
