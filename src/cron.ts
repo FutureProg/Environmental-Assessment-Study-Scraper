@@ -22,12 +22,14 @@ export async function cronHandler() {
         error: err instanceof Error ? err : new Error(String(err)),
       });
     }
-  }
 
-  try {
-    await sendDiscordEmbeds(embedQueue);
-  } catch (err) {
-    console.error('discord batch send failed:', err);
+    // Flush per adapter (rather than once at the very end) so a mid-run crash on a later
+    // adapter doesn't lose notifications for studies already persisted by earlier adapters.
+    try {
+      await sendDiscordEmbeds(embedQueue.splice(0));
+    } catch (err) {
+      console.error(`[${adapter.municipalityOwner}] discord batch send failed:`, err);
+    }
   }
 
   try {
