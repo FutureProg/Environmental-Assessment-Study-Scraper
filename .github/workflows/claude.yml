@@ -1,9 +1,5 @@
 name: Claude Code
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 on:
   issue_comment:
     types: [created]
@@ -26,6 +22,13 @@ jobs:
         (github.event_name == 'issues' && github.event.action == 'opened' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) && (github.event.issue.author_association == 'OWNER' || github.event.issue.author_association == 'COLLABORATOR' || github.event.issue.author_association == 'MEMBER')) ||
         (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude')
       )
+    # At most one session per issue/PR. A new trigger queues behind the running
+    # session instead of cancelling it. This is job-level (not workflow-level) so
+    # runs skipped by the `if` above (e.g. Claude's own status comments) never
+    # enter the group and can't cancel or displace a real queued run.
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
