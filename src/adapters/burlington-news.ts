@@ -1,93 +1,83 @@
 import type { Adapter, DocumentLink, EAStudy, EAStudyDetail } from '../types.ts';
-import { absolutiseHtmlHrefs, absoluteUrl, fetchHtml, fetchJson, parseHtml, sha256Hex } from './http.ts';
+import { absolutiseHtmlHrefs, absoluteUrl, fetchHtml, parseHtml, sha256Hex } from './http.ts';
 
 const BASE_URL = 'https://www.burlington.ca';
-// The site's News module (`/Modules/News/...`) is WAF-blocked, but the NewsModule JSON
-// service that powers the on-page news feeds is not. It returns recent news items across
-// all categories; the EA / capital-project notices are filtered by their URL path below.
-const FEED_PATH = '/Modules/NewsModule/services/getTopFiveNews.ashx?limit=500&lang=en';
 const MUNICIPALITY_OWNER = 'City of Burlington';
 
 /**
- * News items under this path are Burlington's "Current City Projects and Construction"
- * notices — the category that holds Municipal Class EA studies (road, bridge, creek/flood,
- * erosion) alongside capital works. Everything else in the feed (festivals, road closures,
- * development applications, recreation) is dropped here; scope (road-safety relevance) is
- * then decided per study by the classifier.
+ * Category listing pages on the site's news section that hold Municipal Class EA studies
+ * (creek/flood/erosion, road and bridge works). Each card links to a post under
+ * `/news-and-notices/posts/<category>/`. Scope is decided per study by the classifier.
  */
-const PROJECT_PATH = '/en/news/current-city-projects-and-construction/';
-
-/** Shape of a single item in the NewsModule feed JSON (only the fields we use). */
-interface NewsFeedItem {
-  title?: string;
-  link?: string;
-}
+const CATEGORIES = [
+  'environmental-assessments-projects',
+  'road-and-transportation-construction-projects',
+  'stormwater-management-projects',
+];
+const POST_PATH_PREFIXES = [
+  '/news-and-notices/posts/environmental-assessment-projects/',
+  '/news-and-notices/posts/road-and-transportation-construction-projects/',
+  '/news-and-notices/posts/stormwater-management-projects/',
+];
+const MAX_PAGES = 10;
 
 /**
- * Parses Burlington's NewsModule feed JSON into studies.
+ * Parses a Burlington news category listing page into studies.
  *
- * This is a complementary source to Get Involved Burlington: many EA notices (notably the
- * creek/flood/erosion Class EAs) are posted only as news items and never get an engagement
- * project. The feed is a rolling list of recent news, so this captures newly posted notices
- * rather than the full historical archive.
- *
- * There is no status field on the feed, so status is inferred later by the classifier (see
- * `inferStatus` on the adapter). Items are deduplicated by URL. Pure — no network.
+ * Cards are `a.gs-feed-list-title` anchors. Only links under the project post paths are
+ * kept (the page also has unrelated featured event cards). No status field exists, so
+ * status is inferred later by the classifier. Deduplicated by URL. Pure — no network.
  */
-export function parseBurlingtonNewsFeed(json: string): EAStudy[] {
-  let items: unknown;
-  try {
-    items = JSON.parse(json);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(items)) return [];
-
+export function parseBurlingtonNewsListing(html: string): EAStudy[] {
+  const doc = parseHtml(html);
   const studies: EAStudy[] = [];
   const seen = new Set<string>();
 
-  for (const item of items as NewsFeedItem[]) {
-    const link = (item?.link ?? '').trim();
-    if (!link) continue;
+  for (const a of doc.querySelectorAll('a.gs-feed-list-title')) {
+    const href = a.getAttribute('href') ?? '';
     let url: URL;
     try {
-      url = new URL(link, BASE_URL);
+      url = new URL(href, BASE_URL);
     } catch {
       continue;
     }
-    if (!url.pathname.startsWith(PROJECT_PATH)) continue;
-
+    if (!POST_PATH_PREFIXES.some((p) => url.pathname.startsWith(p))) continue;
     const sourceUrl = url.href;
     if (seen.has(sourceUrl)) continue;
-
-    const title = (item?.title ?? '').replace(/\s+/g, ' ').trim();
+    const title = (a.textContent ?? '').replace(/\s+/g, ' ').trim();
     if (!title) continue;
-
     seen.add(sourceUrl);
     studies.push({
       title,
       municipalityOwner: MUNICIPALITY_OWNER,
       municipalityAreas: ['Burlington'],
-      status: 'unknown', // no status in the feed — inferred during classification
+      status: 'unknown', // inferred during classification
       rawStatus: '',
       sourceUrl,
     });
   }
-
   return studies;
 }
 
-/**
- * Fetches Burlington's EA / capital-project news notices from the NewsModule JSON feed.
- */
+/** Fetches every category listing (following `?page=N` until no new posts appear). */
 export async function fetchBurlingtonNewsStudies(): Promise<EAStudy[]> {
-  return parseBurlingtonNewsFeed(await fetchJson(`${BASE_URL}${FEED_PATH}`));
+  const all = new Map<string, EAStudy>();
+  for (const category of CATEGORIES) {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const html = await fetchHtml(`${BASE_URL}/news-and-notices/${category}/?page=${page}`);
+      const studies = parseBurlingtonNewsListing(html);
+      const fresh = studies.filter((s) => !all.has(s.sourceUrl));
+      for (const s of fresh) all.set(s.sourceUrl, s);
+      if (fresh.length === 0) break; // site repeats/empties past the last page
+    }
+  }
+  return [...all.values()];
 }
 
 /**
  * Extracts published-document links from a news page.
  *
- * Documents are hosted under `/en/news/resources/...` as PDF/Office files. The news pages
+ * Documents are hosted under `/media/...` as PDF/Office files. The news pages
  * carry no per-document date label, so `date` is always null. Scoped to the page's main
  * content so global header/footer links are not picked up.
  */
@@ -97,7 +87,7 @@ function extractDocumentLinks(root: Element | Document): DocumentLink[] {
 
   for (const anchor of root.querySelectorAll('a')) {
     const href = anchor.getAttribute('href') ?? '';
-    if (!/\/news\/resources\/.+\.(?:pdf|docx?|xlsx?)(?:[?#].*)?$/i.test(href)) continue;
+    if (!/\/media\/.+\.(?:pdf|docx?|xlsx?)(?:[?#].*)?$/i.test(href)) continue;
 
     const title = anchor.textContent?.replace(/\s+/g, ' ').trim() ?? '';
     if (!title) continue;
@@ -116,18 +106,18 @@ function extractDocumentLinks(root: Element | Document): DocumentLink[] {
  *
  * The individual `.aspx` news pages load fine (only the News *module* listing is blocked).
  * Extracts:
- * - `description`: plain text from the page's `.ge-content` body blocks (truncated, used for classification)
+ * - `description`: plain text from the page's `.usn_cmp_text` body blocks (truncated, used for classification)
  * - `engagementHtml`: inner HTML of those blocks with relative links resolved (used for engagement extraction)
- * - `documentLinks`: published documents from `/en/news/resources/` (title, URL; no date label)
+ * - `documentLinks`: published documents from `/media/` (title, URL; no date label)
  * - `contentHash`: SHA-256 of the body blocks' innerHTML + document titles+hrefs
  *
- * Falls back to `h1` + main content text for `description` when no `.ge-content` block exists.
+ * Falls back to `h1` + main content text for `description` when no `.usn_cmp_text` block exists.
  */
 export async function parseBurlingtonNewsDetail(html: string): Promise<EAStudyDetail> {
   const doc = parseHtml(html);
-  const root = doc.querySelector('#mainContent') ?? doc.body;
+  const root = doc.querySelector('.content-col') ?? doc.body;
 
-  const contentBlocks = Array.from(root.querySelectorAll('.ge-content'));
+  const contentBlocks = Array.from(root.querySelectorAll('.usn_cmp_text'));
 
   let description = contentBlocks
     .map((el) => el.textContent?.replace(/\s+/g, ' ').trim())
