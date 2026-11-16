@@ -42,6 +42,11 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       # Ensures commits made by Claude are attributed to the bot, not the repo owner
       - name: Configure git identity
         run: |
@@ -56,6 +61,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
           display_report: true
+          claude_args: |
+            --allowedTools "Bash(gh pr create:*)"
+            --append-system-prompt "When your work is committed and pushed, open a pull request against the default branch with `gh pr create` instead of only posting a compare link. Reference the issue in the PR body."
           prompt: |
             You have been assigned this GitHub issue via the "claude" label.
             REPO: ${{ github.repository }}
@@ -73,3 +81,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           display_report: true
+          claude_args: |
+            --allowedTools "Bash(gh pr create:*)"
+            --append-system-prompt "When your work is committed and pushed, open a pull request against the default branch with `gh pr create` instead of only posting a compare link. Reference the issue in the PR body."
