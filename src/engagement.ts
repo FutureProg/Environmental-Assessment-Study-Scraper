@@ -51,7 +51,9 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
   const response = await callAnthropicOrFail('engagement HTML sent', detail.engagementHtml, () =>
     client.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 1024,
+      // Pages with many PDF links (e.g. North Halton MCEA) can emit dozens of "document" items;
+      // a small limit truncates the tool call mid-JSON, yielding `input: {}` (stop_reason max_tokens).
+      max_tokens: 8192,
       system: SYSTEM_PROMPT,
       tools: [{
         name: 'extract_engagement_events',
@@ -115,7 +117,8 @@ export async function extractEngagementData(detail: EAStudyDetail): Promise<{
       'raw response content',
       JSON.stringify(response.content, null, 2),
     );
-    throw new FailureError('Engagement extractor returned invalid data', toolFailureData);
+    const truncated = response.stop_reason === 'max_tokens' ? ' (response truncated at max_tokens)' : '';
+    throw new FailureError(`Engagement extractor returned invalid data${truncated}`, toolFailureData);
   }
 
   for (const item of result.events) {
